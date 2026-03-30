@@ -10,6 +10,13 @@ export const BASE_PRICES: Record<CropType, number> = {
   [CropType.Potatis]: 2500,
   [CropType.Sockerbeta]: 450,
   [CropType.Trada]: 0,
+  [CropType.Varvete]: 2100,
+  [CropType.Maltkorn]: 2200,
+  [CropType.Foderkorn]: 1700,
+  [CropType.Grynhavre]: 2000,
+  [CropType.Foderhavre]: 1500,
+  [CropType.Hostrag]: 1900,
+  [CropType.Ragvete]: 2000,
 };
 
 /** Prisvolatilitet som standardavvikelse (12%) */

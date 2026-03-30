@@ -74,6 +74,69 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
   },
+  [CropType.Varvete]: {
+    type: CropType.Varvete,
+    baseYieldPerHa: 5.5,
+    seedCostPerHa: 1100,
+    fertilizerCostPerHa: 2300,
+    harvestCostPerHa: 800,
+    plantQuarter: Quarter.Var,
+    harvestQuarter: Quarter.Host,
+  },
+  [CropType.Maltkorn]: {
+    type: CropType.Maltkorn,
+    baseYieldPerHa: 5.0,
+    seedCostPerHa: 1100,
+    fertilizerCostPerHa: 2200,
+    harvestCostPerHa: 700,
+    plantQuarter: Quarter.Var,
+    harvestQuarter: Quarter.Host,
+  },
+  [CropType.Foderkorn]: {
+    type: CropType.Foderkorn,
+    baseYieldPerHa: 5.5,
+    seedCostPerHa: 800,
+    fertilizerCostPerHa: 1800,
+    harvestCostPerHa: 700,
+    plantQuarter: Quarter.Var,
+    harvestQuarter: Quarter.Host,
+  },
+  [CropType.Grynhavre]: {
+    type: CropType.Grynhavre,
+    baseYieldPerHa: 4.5,
+    seedCostPerHa: 900,
+    fertilizerCostPerHa: 1900,
+    harvestCostPerHa: 700,
+    plantQuarter: Quarter.Var,
+    harvestQuarter: Quarter.Host,
+  },
+  [CropType.Foderhavre]: {
+    type: CropType.Foderhavre,
+    baseYieldPerHa: 5.0,
+    seedCostPerHa: 700,
+    fertilizerCostPerHa: 1600,
+    harvestCostPerHa: 600,
+    plantQuarter: Quarter.Var,
+    harvestQuarter: Quarter.Host,
+  },
+  [CropType.Hostrag]: {
+    type: CropType.Hostrag,
+    baseYieldPerHa: 6.0,
+    seedCostPerHa: 1000,
+    fertilizerCostPerHa: 2200,
+    harvestCostPerHa: 750,
+    plantQuarter: Quarter.Host,
+    harvestQuarter: Quarter.Host, // skördas hösten året efter
+  },
+  [CropType.Ragvete]: {
+    type: CropType.Ragvete,
+    baseYieldPerHa: 6.5,
+    seedCostPerHa: 1100,
+    fertilizerCostPerHa: 2400,
+    harvestCostPerHa: 800,
+    plantQuarter: Quarter.Host,
+    harvestQuarter: Quarter.Host, // skördas hösten året efter
+  },
 };
 
 /** Alias för bakåtkompatibilitet med engine */
@@ -89,6 +152,13 @@ export const PLANTING_QUARTERS: Record<CropType, Quarter[]> = {
   [CropType.Potatis]: [Quarter.Var],
   [CropType.Sockerbeta]: [Quarter.Var],
   [CropType.Trada]: [Quarter.Var, Quarter.Host],
+  [CropType.Varvete]: [Quarter.Var],
+  [CropType.Maltkorn]: [Quarter.Var],
+  [CropType.Foderkorn]: [Quarter.Var],
+  [CropType.Grynhavre]: [Quarter.Var],
+  [CropType.Foderhavre]: [Quarter.Var],
+  [CropType.Hostrag]: [Quarter.Host],
+  [CropType.Ragvete]: [Quarter.Host],
 };
 
 /** Vilka kvartal varje gröda skördas */
@@ -101,4 +171,11 @@ export const HARVEST_QUARTERS: Record<CropType, Quarter[]> = {
   [CropType.Potatis]: [Quarter.Host],
   [CropType.Sockerbeta]: [Quarter.Host],
   [CropType.Trada]: [],
+  [CropType.Varvete]: [Quarter.Host],
+  [CropType.Maltkorn]: [Quarter.Host],
+  [CropType.Foderkorn]: [Quarter.Host],
+  [CropType.Grynhavre]: [Quarter.Host],
+  [CropType.Foderhavre]: [Quarter.Host],
+  [CropType.Hostrag]: [Quarter.Host],
+  [CropType.Ragvete]: [Quarter.Host],
 };

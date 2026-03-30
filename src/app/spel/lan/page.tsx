@@ -8,7 +8,7 @@ import Table from "@/components/ui/Table";
 
 export default function LanPage() {
   const state = useGameStore((s) => s.state);
-  const updateDecisions = useGameStore((s) => s.updateDecisions);
+  const takeLoan = useGameStore((s) => s.takeLoan);
   if (!state) return null;
 
   const { loans } = state.finances;
@@ -99,11 +99,7 @@ export default function LanPage() {
             </div>
           </div>
           <Button
-            onClick={() =>
-              updateDecisions({
-                newLoan: { amount: newAmount, termYears: newTerm, interestRate: 0.05 },
-              })
-            }
+            onClick={() => takeLoan(newAmount, newTerm, 0.05)}
           >
             Ansök om lån
           </Button>

@@ -23,6 +23,13 @@ export enum CropType {
   Potatis = "Potatis",
   Sockerbeta = "Sockerbeta",
   Trada = "Träda",
+  Varvete = "Vårvete",
+  Maltkorn = "Maltkorn",
+  Foderkorn = "Foderkorn",
+  Grynhavre = "Grynhavre",
+  Foderhavre = "Foderhavre",
+  Hostrag = "Höstråg",
+  Ragvete = "Rågvete",
 }
 
 export enum AnimalType {

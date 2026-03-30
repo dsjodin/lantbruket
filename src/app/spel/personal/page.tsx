@@ -6,7 +6,8 @@ import Button from "@/components/ui/Button";
 
 export default function PersonalPage() {
   const state = useGameStore((s) => s.state);
-  const updateDecisions = useGameStore((s) => s.updateDecisions);
+  const hireWorker = useGameStore((s) => s.hireWorker);
+  const fireWorker = useGameStore((s) => s.fireWorker);
   if (!state) return null;
 
   const { employees } = state.farm;
@@ -38,12 +39,12 @@ export default function PersonalPage() {
           Fler anställda behövs vid större gårdar och djurhållning.
         </p>
         <div className="flex gap-3">
-          <Button onClick={() => updateDecisions({ hireWorkers: 1 })}>
+          <Button onClick={hireWorker}>
             Anställ +1
           </Button>
           <Button
             variant="danger"
-            onClick={() => updateDecisions({ hireWorkers: -1 })}
+            onClick={fireWorker}
             disabled={employees === 0}
           >
             Säg upp -1
