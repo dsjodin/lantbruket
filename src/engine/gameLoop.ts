@@ -88,31 +88,54 @@ export function createInitialGameState(params: {
     totalYears,
   } = params;
 
-  // Divide land into ~5 equal plots
-  const plotCount = 5;
-  const hectaresPerPlot =
-    Math.floor((totalHectares / plotCount) * 10) / 10;
-  const remainder =
-    Math.round((totalHectares - hectaresPerPlot * plotCount) * 10) / 10;
-
+  // Generate realistic field layout based on farm size
   const rng = createRandom(totalHectares + startingCapital);
 
-  const fields: Field[] = [];
+  // Number of fields depends on total size
+  const plotCount =
+    totalHectares <= 50 ? 3 + Math.floor(rng.next() * 3) :       // 3-5
+    totalHectares <= 150 ? 5 + Math.floor(rng.next() * 4) :      // 5-8
+    totalHectares <= 300 ? 8 + Math.floor(rng.next() * 5) :      // 8-12
+    10 + Math.floor(rng.next() * 6);                              // 10-15
+
+  // Swedish field names
+  const fieldNames = [
+    "Storgärdet", "Lillåkern", "Kvarnfältet", "Ängsviken", "Norrskiftet",
+    "Söderskiftet", "Backstugan", "Sjöängen", "Hagmarksfältet", "Tallåkern",
+    "Björkängen", "Mossfältet", "Kullfältet", "Sandåkern", "Lerbacken",
+  ];
+
+  // Generate random weights and normalize to total hectares
+  const weights: number[] = [];
   for (let i = 0; i < plotCount; i++) {
-    const ha =
-      i === plotCount - 1
-        ? hectaresPerPlot + remainder
-        : hectaresPerPlot;
+    // Use a mix to get varied but not extreme sizes
+    weights.push(0.5 + rng.next() * 1.5);
+  }
+  const weightSum = weights.reduce((a, b) => a + b, 0);
+
+  const fields: Field[] = [];
+  let allocatedHa = 0;
+  for (let i = 0; i < plotCount; i++) {
+    const isLast = i === plotCount - 1;
+    const ha = isLast
+      ? Math.round((totalHectares - allocatedHa) * 10) / 10
+      : Math.round((totalHectares * weights[i] / weightSum) * 10) / 10;
+    allocatedHa += ha;
+
     fields.push({
       id: `field-${i + 1}`,
-      hectares: Math.round(ha * 10) / 10,
+      name: fieldNames[i % fieldNames.length],
+      hectares: Math.max(ha, 1), // Minimum 1 ha
       crop: null,
       soilQuality:
-        Math.round((0.9 + rng.next() * 0.2) * 100) / 100, // 0.9 - 1.1
+        Math.round((0.8 + rng.next() * 0.4) * 100) / 100, // 0.8 - 1.2
       fertilizerApplied: false,
       status: "Oplöjd",
     });
   }
+
+  // Sort fields largest first for a natural feel
+  fields.sort((a, b) => b.hectares - a.hectares);
 
   // Create initial loan if requested
   const loans = [];

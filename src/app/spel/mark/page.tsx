@@ -47,7 +47,7 @@ export default function MarkPage() {
             >
               <div>
                 <div className="font-medium text-sm">
-                  {field.crop || "Tomt fält"} - {field.hectares} ha
+                  {field.name} ({field.hectares} ha) — {field.crop || "Tomt fält"}
                 </div>
                 <div className="text-xs text-stone-500">
                   Jordkvalitet: {Math.round(field.soilQuality * 100)}%

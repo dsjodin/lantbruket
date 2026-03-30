@@ -18,6 +18,7 @@ export interface Farm {
 
 export interface Field {
   id: string;
+  name: string;
   hectares: number;
   crop: CropType | null;
   soilQuality: number; // 0.8 - 1.2

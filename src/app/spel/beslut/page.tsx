@@ -360,7 +360,7 @@ function PlantingCard({ crops, quarter }: { crops: CropType[]; quarter: Quarter 
               return (
                 <div key={f.id} className="flex justify-between items-center p-2 bg-stone-50 rounded-lg">
                   <div>
-                    <span className="text-sm font-medium">Fält {f.id.replace("field-", "")} </span>
+                    <span className="text-sm font-medium">{f.name} </span>
                     <span className="text-xs text-stone-400">
                       ({f.hectares} ha, jord {Math.round(f.soilQuality * 100)}%)
                     </span>
