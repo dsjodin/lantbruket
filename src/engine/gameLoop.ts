@@ -519,10 +519,9 @@ export function advanceQuarter(
   if (eventState.healthDelta !== 0) {
     livestock = applyHealthChange(livestock, eventState.healthDelta);
   }
-  // Track event income/costs separately for the financial record
+  // Track event income/costs for the financial record (flows through revenue/costs, not direct cash)
   const eventIncome = Math.max(0, eventState.directCashChange);
   const eventCost = Math.max(0, -eventState.directCashChange);
-  cash += eventState.directCashChange;
 
   // Apply event price modifiers to crop sales revenue
   let eventPriceAdjustment = 0;
