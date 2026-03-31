@@ -34,7 +34,7 @@ import {
 } from "./livestock";
 import { calculateSubsidies } from "./subsidies";
 import { calculateQuarterlyPayment, processLoanPayment, createLoan } from "./loans";
-import { generateEvents, applyEventEffects, type EventState } from "./events";
+import { generateEvents, applyEventEffects, type EventState, type FarmContext } from "./events";
 import {
   calculateQuarterRevenue,
   calculateQuarterCosts,
@@ -501,7 +501,11 @@ export function advanceQuarter(
   });
 
   // ---- Step 14: Generate and apply random events ----
-  const events = generateEvents(currentQuarter, seed, currentYear);
+  const farmContext: FarmContext = {
+    animalTypes: livestock.map((h) => h.type),
+    cropTypes: [...new Set(fields.filter((f) => f.crop).map((f) => f.crop!))],
+  };
+  const events = generateEvents(currentQuarter, seed, currentYear, farmContext);
 
   let eventState: EventState = {
     yieldModifier: 0,
