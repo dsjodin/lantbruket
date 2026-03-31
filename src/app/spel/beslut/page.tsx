@@ -551,7 +551,7 @@ function GrainSalesCard() {
   const totalStored = Object.values(storage).reduce((a, b) => a + b, 0);
   const siloCapacity = state.farm.siloCapacity || 500;
 
-  const storedCrops = Object.entries(storage).filter(([, tons]) => tons > 0);
+  const storedCrops = Object.entries(storage).filter(([, tons]) => tons >= 0.05);
 
   // Build price history for stored crops
   const priceHistory: Record<string, number[]> = {};
@@ -585,8 +585,8 @@ function GrainSalesCard() {
         <div className="space-y-3">
           {storedCrops.map(([crop, tons]) => {
             const price = prices[crop] ?? 0;
-            const amount = sellAmounts[crop] ?? Math.round(tons);
-            const clampedAmount = Math.min(amount, tons);
+            const amount = sellAmounts[crop] ?? Math.round(tons * 10) / 10;
+            const clampedAmount = Math.round(Math.min(amount, tons) * 10) / 10;
             const estimatedRevenue = Math.round(clampedAmount * price);
             const history = priceHistory[crop] || [];
             const avgPrice = history.length > 0 ? history.reduce((a, b) => a + b, 0) / history.length : price;
@@ -626,29 +626,42 @@ function GrainSalesCard() {
                   <input
                     type="range"
                     min={0}
-                    max={Math.ceil(tons)}
-                    step={1}
+                    max={Math.round(tons * 10) / 10}
+                    step={0.1}
                     value={clampedAmount}
                     onChange={(e) => setSellAmounts({ ...sellAmounts, [crop]: Number(e.target.value) })}
                     className="flex-1 accent-amber-600"
                   />
-                  <span className="text-xs w-16 text-right">{clampedAmount} ton</span>
+                  <span className="text-xs w-16 text-right">{clampedAmount.toFixed(1)} ton</span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-green-700">
                     = {estimatedRevenue.toLocaleString("sv-SE")} kr
                   </span>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      sellGrain(crop as CropType, clampedAmount);
-                      setSellAmounts({ ...sellAmounts, [crop]: 0 });
-                    }}
-                    disabled={clampedAmount <= 0}
-                  >
-                    Sälj
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        sellGrain(crop as CropType, Math.round(tons * 10) / 10);
+                        setSellAmounts({ ...sellAmounts, [crop]: 0 });
+                      }}
+                      disabled={tons < 0.05}
+                    >
+                      Sälj allt
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        sellGrain(crop as CropType, clampedAmount);
+                        setSellAmounts({ ...sellAmounts, [crop]: 0 });
+                      }}
+                      disabled={clampedAmount <= 0}
+                    >
+                      Sälj
+                    </Button>
+                  </div>
                 </div>
               </div>
             );
