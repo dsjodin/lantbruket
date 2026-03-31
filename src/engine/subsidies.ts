@@ -1,0 +1,98 @@
+/**
+ * Swedish agricultural subsidy calculations.
+ */
+
+import type { Farm, SubsidyApplication, SubsidyType } from "@/types";
+import { Region, AnimalType } from "@/types";
+import { REGIONS_DATA } from "@/data/regions";
+import { LIVESTOCK_DATA } from "@/data/livestock";
+
+/**
+ * Calculate subsidies based on Swedish agricultural support rules.
+ * Returns an array of SubsidyApplication objects with status "Beviljad".
+ */
+export function calculateSubsidies(
+  farm: Farm,
+  region: Region,
+  appliedTypes: SubsidyType[]
+): SubsidyApplication[] {
+  const regionData = REGIONS_DATA[region];
+  const results: SubsidyApplication[] = [];
+  const totalHa = farm.totalHectares;
+
+  // Count distinct crops planted (excluding null and fallow)
+  const distinctCrops = new Set(
+    farm.fields
+      .filter((f) => f.crop !== null && f.crop !== "Träda")
+      .map((f) => f.crop)
+  );
+
+  for (const subsidyType of appliedTypes) {
+    let amount = 0;
+
+    switch (subsidyType) {
+      case "Grundbetalning":
+        // Per hectare based on region
+        amount = totalHa * regionData.grundbetalningPerHa;
+        break;
+
+      case "Förgröningsstöd":
+        // 700 kr/ha, but requires 3+ different crops if >30ha
+        if (totalHa > 30 && distinctCrops.size < 3) {
+          // Does not qualify
+          amount = 0;
+        } else {
+          amount = totalHa * 700;
+        }
+        break;
+
+      case "Kompensationsstöd":
+        // Per hectare based on region
+        amount = totalHa * regionData.kompensationsstodPerHa;
+        break;
+
+      case "Miljöersättning":
+        // 900 kr/ha for land with environmental measures (simplified: 50% of land)
+        amount = Math.floor(totalHa * 0.5) * 900;
+        break;
+
+      case "Djurvälfärdsersättning": {
+        // Per animal based on type - use a flat rate per animal
+        const animalWelfareRates: Record<string, number> = {
+          [AnimalType.Mjolkko]: 1600,
+          [AnimalType.Diko]: 1100,
+          [AnimalType.Slaktsvin]: 250,
+          [AnimalType.Varphons]: 20,
+          [AnimalType.Tacka]: 500,
+        };
+        amount = farm.livestock.reduce((sum, herd) => {
+          const rate = animalWelfareRates[herd.type] ?? 0;
+          return sum + herd.count * rate;
+        }, 0);
+        break;
+      }
+
+      case "Nötkreatursstöd": {
+        // 1050 kr per cow (mjölkko + diko)
+        const cowCount = farm.livestock
+          .filter(
+            (h) => h.type === AnimalType.Mjolkko || h.type === AnimalType.Diko
+          )
+          .reduce((sum, h) => sum + h.count, 0);
+        amount = cowCount * 1050;
+        break;
+      }
+    }
+
+    if (amount > 0) {
+      results.push({
+        type: subsidyType,
+        appliedYear: 0, // Caller should set the actual year
+        amount: Math.round(amount),
+        status: "Beviljad",
+      });
+    }
+  }
+
+  return results;
+}

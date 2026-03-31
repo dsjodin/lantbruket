@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+:root {
+  --color-spring: #4ade80;
+  --color-summer: #facc15;
+  --color-autumn: #f97316;
+  --color-winter: #60a5fa;
+  --color-spring-bg: #f0fdf4;
+  --color-summer-bg: #fefce8;
+  --color-autumn-bg: #fff7ed;
+  --color-winter-bg: #eff6ff;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
