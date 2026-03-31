@@ -12,6 +12,24 @@ import {
 
 const SAVE_KEY = "lantbruket-save";
 
+export interface QuarterResult {
+  year: number;
+  quarter: string;
+  previousCash: number;
+  newCash: number;
+  cashChange: number;
+  weather: string;
+  events: { title: string; description: string; category: string; effects: { type: string; value: number; target?: string }[] }[];
+  harvestedCrops: Record<string, number>; // crop → tons added to storage
+  financialRecord: {
+    revenue: { cropSales: number; livestockIncome: number; subsidies: number; other: number };
+    costs: { seeds: number; fertilizer: number; fuel: number; machinery: number; feed: number; veterinary: number; salaries: number; loanInterest: number; loanAmortization: number; insurance: number; buildingMaintenance: number; other: number };
+    netResult: number;
+  };
+  marketPrices: Record<string, number>;
+  previousMarketPrices: Record<string, number>;
+}
+
 const emptyDecisions: QuarterDecisions = {
   cropActions: [],
   livestockActions: [],
@@ -27,6 +45,8 @@ interface GameStore {
   state: GameState | null;
   pendingDecisions: QuarterDecisions;
   messages: { text: string; type: "success" | "error" | "info" }[];
+  showQuarterSummary: boolean;
+  lastQuarterResult: QuarterResult | null;
 
   startGame: (params: {
     playerName: string;
@@ -51,6 +71,7 @@ interface GameStore {
 
   updateDecisions: (partial: Partial<QuarterDecisions>) => void;
   advanceQuarter: () => void;
+  dismissSummary: () => void;
   clearMessages: () => void;
   save: () => void;
   load: () => boolean;
@@ -61,6 +82,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   state: null,
   pendingDecisions: { ...emptyDecisions },
   messages: [],
+  showQuarterSummary: false,
+  lastQuarterResult: null,
 
   startGame: (params) => {
     const gameState = createInitialGameState(params);
@@ -320,16 +343,63 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { state, pendingDecisions } = get();
     if (!state || state.phase !== "decisions") return;
 
-    // No auto-sell: grain stays in storage until player manually sells
+    const previousCash = state.finances.cashBalance;
+    const previousStorage = { ...(state.farm.storage || {}) };
+    const previousMarketPrices = { ...(state.currentMarketPrices || {}) };
+
     const newState = advanceQuarter(state, pendingDecisions);
+
+    // Compute harvested crops (storage diff)
+    const newStorage = newState.farm.storage || {};
+    const harvestedCrops: Record<string, number> = {};
+    for (const [crop, tons] of Object.entries(newStorage)) {
+      const prev = previousStorage[crop] ?? 0;
+      const diff = tons - prev;
+      if (diff > 0.05) harvestedCrops[crop] = Math.round(diff * 10) / 10;
+    }
+
+    // Build quarter result from the latest history entry
+    const latestRecord = newState.history[newState.history.length - 1];
+    const quarterResult: QuarterResult = {
+      year: state.currentYear,
+      quarter: state.currentQuarter,
+      previousCash,
+      newCash: newState.finances.cashBalance,
+      cashChange: newState.finances.cashBalance - previousCash,
+      weather: latestRecord?.weather ?? "Normalt",
+      events: (newState.activeEvents || []).map(e => ({
+        title: e.title,
+        description: e.description,
+        category: e.category,
+        effects: e.effects.map(eff => ({ type: eff.type, value: eff.value, target: eff.target as string | undefined })),
+      })),
+      harvestedCrops,
+      financialRecord: latestRecord ? {
+        revenue: { ...latestRecord.financialRecord.revenue },
+        costs: { ...latestRecord.financialRecord.costs },
+        netResult: latestRecord.financialRecord.netResult,
+      } : {
+        revenue: { cropSales: 0, livestockIncome: 0, subsidies: 0, other: 0 },
+        costs: { seeds: 0, fertilizer: 0, fuel: 0, machinery: 0, feed: 0, veterinary: 0, salaries: 0, loanInterest: 0, loanAmortization: 0, insurance: 0, buildingMaintenance: 0, other: 0 },
+        netResult: 0,
+      },
+      marketPrices: { ...(newState.currentMarketPrices || {}) },
+      previousMarketPrices,
+    };
 
     set({
       state: newState,
       pendingDecisions: { ...emptyDecisions },
       messages: [],
+      showQuarterSummary: true,
+      lastQuarterResult: quarterResult,
     });
 
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(newState)); } catch {}
+  },
+
+  dismissSummary: () => {
+    set({ showQuarterSummary: false });
   },
 
   save: () => {
@@ -372,6 +442,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   reset: () => {
     try { localStorage.removeItem(SAVE_KEY); } catch {}
-    set({ state: null, pendingDecisions: { ...emptyDecisions }, messages: [] });
+    set({ state: null, pendingDecisions: { ...emptyDecisions }, messages: [], showQuarterSummary: false, lastQuarterResult: null });
   },
 }));

@@ -4,13 +4,25 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import TopBar from "@/components/layout/TopBar";
+import QuarterSummary from "@/components/game/QuarterSummary";
 import { useGameStore } from "@/store/gameStore";
+import { Quarter } from "@/types/enums";
+
+const seasonBg: Record<string, string> = {
+  [Quarter.Var]: "bg-[#f0fdf4]",
+  [Quarter.Sommar]: "bg-[#fefce8]",
+  [Quarter.Host]: "bg-[#fff7ed]",
+  [Quarter.Vinter]: "bg-[#eff6ff]",
+};
 
 export default function SpelLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const state = useGameStore((s) => s.state);
   const advanceQuarter = useGameStore((s) => s.advanceQuarter);
   const save = useGameStore((s) => s.save);
+  const showQuarterSummary = useGameStore((s) => s.showQuarterSummary);
+  const lastQuarterResult = useGameStore((s) => s.lastQuarterResult);
+  const dismissSummary = useGameStore((s) => s.dismissSummary);
 
   useEffect(() => {
     if (!state) {
@@ -34,6 +46,8 @@ export default function SpelLayout({ children }: { children: React.ReactNode }) 
     return null;
   }
 
+  const mainBg = seasonBg[state.currentQuarter] || "bg-white";
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -47,8 +61,14 @@ export default function SpelLayout({ children }: { children: React.ReactNode }) 
           onAdvanceQuarter={advanceQuarter}
           phase={state.phase}
         />
-        <main className="flex-1 p-6 overflow-auto">{children}</main>
+        <main className={`flex-1 p-6 overflow-auto transition-colors duration-500 ${mainBg}`}>
+          {children}
+        </main>
       </div>
+
+      {showQuarterSummary && lastQuarterResult && (
+        <QuarterSummary result={lastQuarterResult} onContinue={dismissSummary} />
+      )}
     </div>
   );
 }

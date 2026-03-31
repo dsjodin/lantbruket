@@ -553,6 +553,15 @@ function GrainSalesCard() {
 
   const storedCrops = Object.entries(storage).filter(([, tons]) => tons > 0);
 
+  // Build price history for stored crops
+  const priceHistory: Record<string, number[]> = {};
+  for (const [crop] of storedCrops) {
+    priceHistory[crop] = state.history
+      .slice(-8)
+      .map((h) => (h.marketPrices as Record<string, number>)?.[crop] ?? 0)
+      .filter((p) => p > 0);
+  }
+
   return (
     <Card title="Spannmålslager & Försäljning" accent="amber">
       <div className="mb-3">
@@ -579,6 +588,9 @@ function GrainSalesCard() {
             const amount = sellAmounts[crop] ?? Math.round(tons);
             const clampedAmount = Math.min(amount, tons);
             const estimatedRevenue = Math.round(clampedAmount * price);
+            const history = priceHistory[crop] || [];
+            const avgPrice = history.length > 0 ? history.reduce((a, b) => a + b, 0) / history.length : price;
+            const priceVsAvg = avgPrice > 0 ? ((price - avgPrice) / avgPrice) * 100 : 0;
 
             return (
               <div key={crop} className="p-2 bg-stone-50 rounded-lg space-y-2">
@@ -587,9 +599,28 @@ function GrainSalesCard() {
                   <span className="text-xs text-stone-500">{tons.toFixed(1)} ton i lager</span>
                 </div>
 
-                <div className="text-xs text-stone-500">
-                  Marknadspris: <strong className="text-stone-700">{price.toLocaleString("sv-SE")} kr/ton</strong>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-stone-500">
+                    Marknadspris: <strong className="text-stone-700">{price.toLocaleString("sv-SE")} kr/ton</strong>
+                    {Math.abs(priceVsAvg) > 3 && (
+                      <span className={`ml-1.5 font-semibold ${priceVsAvg > 0 ? "text-green-600" : "text-red-500"}`}>
+                        {priceVsAvg > 0 ? "▲" : "▼"} {Math.abs(Math.round(priceVsAvg))}%
+                      </span>
+                    )}
+                  </div>
+                  {/* Mini sparkline */}
+                  {history.length >= 2 && (
+                    <MiniSparkline values={[...history, price]} />
+                  )}
                 </div>
+
+                {Math.abs(priceVsAvg) > 5 && (
+                  <div className={`text-xs px-2 py-1 rounded ${priceVsAvg > 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+                    {priceVsAvg > 0
+                      ? `Priset ligger ${Math.round(priceVsAvg)}% över snittet — bra tillfälle att sälja!`
+                      : `Priset ligger ${Math.abs(Math.round(priceVsAvg))}% under snittet — överväg att vänta.`}
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2">
                   <input
@@ -630,5 +661,30 @@ function GrainSalesCard() {
         med att sälja om du tror att priset stiger!
       </div>
     </Card>
+  );
+}
+
+function MiniSparkline({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const w = 60;
+  const h = 20;
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * w;
+    const y = h - ((v - min) / range) * h;
+    return `${x},${y}`;
+  }).join(" ");
+
+  const lastVal = values[values.length - 1];
+  const prevVal = values[values.length - 2];
+  const color = lastVal >= prevVal ? "#16a34a" : "#dc2626";
+
+  return (
+    <svg width={w} height={h} className="flex-shrink-0">
+      <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} />
+      <circle cx={w} cy={h - ((lastVal - min) / range) * h} r="2" fill={color} />
+    </svg>
   );
 }
