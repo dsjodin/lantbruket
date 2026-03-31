@@ -173,7 +173,7 @@ export function createInitialGameState(params: {
       buildings: BuildingLevel.Simple,
       employees: 1,
       storage: {},
-      siloCapacity: 500,
+      siloCapacity: Math.round(totalHectares * 5), // ~5 ton/ha kapacitet
     },
     finances: {
       cashBalance: startingCapital + loanAmount,
@@ -370,18 +370,33 @@ export function advanceQuarter(
     }
   }
 
-  // Clamp total storage to silo capacity
-  const totalStored = Object.values(storage).reduce((a, b) => a + b, 0);
-  if (totalStored > siloCapacity) {
-    // Overflow: oldest (existing) grain is discarded proportionally
-    const scale = siloCapacity / totalStored;
-    for (const key of Object.keys(storage)) {
-      storage[key] = Math.round(storage[key] * scale * 10) / 10;
-    }
-  }
-
   // ---- Step 8: Generate market prices ----
   const marketPrices = generateMarketPrices(seed, currentYear, currentQuarter);
+
+  // Sell overflow that doesn't fit in silo at current market price
+  let overflowRevenue = 0;
+  const totalStored = Object.values(storage).reduce((a, b) => a + b, 0);
+  if (totalStored > siloCapacity) {
+    const overflow = totalStored - siloCapacity;
+    // Sell newest harvest first (proportional from harvested crops)
+    const harvestedTotal = Object.values(harvestedCrops).reduce((a, b) => a + b, 0);
+    if (harvestedTotal > 0) {
+      let remaining = overflow;
+      for (const [crop, harvested] of Object.entries(harvestedCrops)) {
+        const sellTons = Math.min(
+          Math.round((harvested / harvestedTotal) * overflow * 10) / 10,
+          storage[crop] ?? 0,
+          remaining
+        );
+        if (sellTons > 0) {
+          overflowRevenue += sellTons * (marketPrices[crop as CropType] ?? 0);
+          storage[crop] = Math.round(((storage[crop] ?? 0) - sellTons) * 10) / 10;
+          if (storage[crop] <= 0) delete storage[crop];
+          remaining -= sellTons;
+        }
+      }
+    }
+  }
 
   // ---- Step 9: Process crop sales (from manual sellGrain decisions) ----
   const cropSales = {} as Record<
@@ -514,8 +529,8 @@ export function advanceQuarter(
     subsidyPayments,
   });
 
-  // Adjust revenue for event price modifiers
-  revenue.cropSales = Math.round(revenue.cropSales + eventPriceAdjustment);
+  // Adjust revenue for event price modifiers and silo overflow sales
+  revenue.cropSales = Math.round(revenue.cropSales + eventPriceAdjustment + overflowRevenue);
 
   // Apply event cost modifier
   const costMultiplier = 1 + eventState.costModifier;
@@ -618,12 +633,26 @@ export function advanceQuarter(
     };
   });
 
-  // Re-clamp storage after pre-harvest
+  // Sell overflow from pre-harvest at next quarter's market prices
+  const nextMarketPrices = generateMarketPrices(seed, nextYear, nextQuarter);
   const totalStoredFinal = Object.values(storage).reduce((a, b) => a + b, 0);
   if (totalStoredFinal > siloCapacity) {
-    const scale = siloCapacity / totalStoredFinal;
-    for (const key of Object.keys(storage)) {
-      storage[key] = Math.round(storage[key] * scale * 10) / 10;
+    const overflow = totalStoredFinal - siloCapacity;
+    const storedEntries = Object.entries(storage).filter(([, v]) => v > 0);
+    const storedTotal = storedEntries.reduce((a, [, v]) => a + v, 0);
+    let remaining = overflow;
+    for (const [crop, stored] of storedEntries) {
+      const sellTons = Math.min(
+        Math.round((stored / storedTotal) * overflow * 10) / 10,
+        stored,
+        remaining
+      );
+      if (sellTons > 0) {
+        overflowRevenue += sellTons * (nextMarketPrices[crop as CropType] ?? 0);
+        storage[crop] = Math.round((stored - sellTons) * 10) / 10;
+        if (storage[crop] <= 0) delete storage[crop];
+        remaining -= sellTons;
+      }
     }
   }
 
