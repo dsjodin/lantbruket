@@ -347,13 +347,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const offer = (state.pendingLandOffers || []).find((o) => o.id === offerId);
     if (!offer) return;
 
-    if (state.finances.cashBalance < offer.totalPrice) {
+    // Buy: check upfront cost. Lease: no upfront cost (quarterly charge).
+    if (offer.type === "buy" && state.finances.cashBalance < offer.totalPrice) {
       set({ messages: [{ text: `Inte tillräckligt med pengar! Kostar ${offer.totalPrice.toLocaleString("sv-SE")} kr.`, type: "error" }] });
       return;
     }
 
+    const isLease = offer.type === "lease";
+
     // Create new fields from the offer
-    const newFields: { id: string; name: string; hectares: number; crop: null; soilQuality: number; fertilizerApplied: boolean; status: "Oplöjd"; plantedYear: null; plantedQuarter: null }[] = [];
+    const newFields: { id: string; name: string; hectares: number; crop: null; soilQuality: number; fertilizerApplied: boolean; status: "Oplöjd"; plantedYear: null; plantedQuarter: null; leased?: boolean; leaseAnnualCost?: number }[] = [];
     const fieldCount = offer.hectares > 15 ? 2 : 1;
     for (let i = 0; i < fieldCount; i++) {
       const ha = i === fieldCount - 1
@@ -369,11 +372,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
         status: "Oplöjd" as const,
         plantedYear: null,
         plantedQuarter: null,
+        ...(isLease ? { leased: true, leaseAnnualCost: Math.round(offer.totalPrice * (ha / offer.hectares)) } : {}),
       });
     }
 
     const updatedOffers = (state.pendingLandOffers || []).filter((o) => o.id !== offerId);
     const newTotalHa = state.farm.totalHectares + offer.hectares;
+    const cashDeduction = isLease ? 0 : offer.totalPrice;
 
     set({
       state: {
@@ -386,12 +391,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
         },
         finances: {
           ...state.finances,
-          cashBalance: state.finances.cashBalance - offer.totalPrice,
+          cashBalance: state.finances.cashBalance - cashDeduction,
         },
         pendingLandOffers: updatedOffers,
       },
       messages: [{
-        text: `${offer.type === "buy" ? "Köpt" : "Arrenderat"} ${offer.hectares} ha mark (${offer.fieldName})! (-${offer.totalPrice.toLocaleString("sv-SE")} kr)`,
+        text: isLease
+          ? `Arrenderat ${offer.hectares} ha mark (${offer.fieldName})! Kostnad ${offer.totalPrice.toLocaleString("sv-SE")} kr/år.`
+          : `Köpt ${offer.hectares} ha mark (${offer.fieldName})! (-${offer.totalPrice.toLocaleString("sv-SE")} kr)`,
         type: "success",
       }],
     });

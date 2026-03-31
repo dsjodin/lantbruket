@@ -107,6 +107,7 @@ export default function MarkPage() {
                 <div className="text-xs text-stone-500">
                   Jordkvalitet: {Math.round(field.soilQuality * 100)}%
                   {field.fertilizerApplied && " | Gödslad"}
+                  {field.leased && ` | Arrende ${((field.leaseAnnualCost ?? 0) / 1000).toFixed(0)}k kr/år`}
                 </div>
               </div>
               <Badge color={statusColors[field.status] || "stone"}>

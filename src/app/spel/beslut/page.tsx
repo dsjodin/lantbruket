@@ -81,7 +81,8 @@ function LandOffersCard() {
   return (
     <div className="space-y-3">
       {offers.map((offer) => {
-        const canAfford = state.finances.cashBalance >= offer.totalPrice;
+        const isLease = offer.type === "lease";
+        const canAfford = isLease || state.finances.cashBalance >= offer.totalPrice;
         const pricePerHa = Math.round(offer.totalPrice / offer.hectares);
         return (
           <div
@@ -93,14 +94,14 @@ function LandOffersCard() {
                 <div className="flex items-center gap-2">
                   <span className="text-xl">🏡</span>
                   <span className="font-semibold text-stone-800">
-                    {offer.type === "buy" ? "Mark till salu" : "Arrendemark tillgänglig"}
+                    {isLease ? "Arrendemark tillgänglig" : "Mark till salu"}
                   </span>
                 </div>
                 <p className="text-sm text-stone-600 mt-1">{offer.description}</p>
                 <div className="flex gap-4 mt-2 text-xs text-stone-500">
                   <span>{offer.hectares} ha</span>
                   <span>Jordkvalitet: {Math.round(offer.soilQuality * 100)}%</span>
-                  <span>{pricePerHa.toLocaleString("sv-SE")} kr/ha</span>
+                  <span>{pricePerHa.toLocaleString("sv-SE")} kr/ha{isLease ? "/år" : ""}</span>
                 </div>
               </div>
             </div>
@@ -110,7 +111,9 @@ function LandOffersCard() {
                 onClick={() => acceptLandOffer(offer.id)}
                 disabled={!canAfford}
               >
-                {offer.type === "buy" ? "Köp" : "Arrendera"} ({offer.totalPrice.toLocaleString("sv-SE")} kr)
+                {isLease
+                  ? `Arrendera (${offer.totalPrice.toLocaleString("sv-SE")} kr/år)`
+                  : `Köp (${offer.totalPrice.toLocaleString("sv-SE")} kr)`}
                 {!canAfford && " — ej råd"}
               </Button>
               <Button

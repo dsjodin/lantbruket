@@ -710,16 +710,16 @@ export function advanceQuarter(
     }
     if (landRng.chance(0.10)) {
       const ha = Math.round(5 + landRng.next() * 20); // 5-25 ha
-      const leasePrice = Math.round(ha * (2000 + landRng.next() * 3000)); // 2k-5k kr/ha
+      const annualLease = Math.round(ha * (2000 + landRng.next() * 3000)); // 2k-5k kr/ha/år
       const nameIdx = Math.floor(landRng.next() * offerFieldNames.length);
       landOffers.push({
         id: `land-lease-${nextYear}-${nextQuarter}`,
         type: "lease",
         hectares: ha,
-        totalPrice: leasePrice,
+        totalPrice: annualLease,
         fieldName: offerFieldNames[nameIdx],
         soilQuality: Math.round((0.75 + landRng.next() * 0.3) * 100) / 100,
-        description: `${ha} ha arrendemark vid "${offerFieldNames[nameIdx]}" finns tillgängligt. Engångskostnad ${leasePrice.toLocaleString("sv-SE")} kr.`,
+        description: `${ha} ha arrendemark vid "${offerFieldNames[nameIdx]}" finns tillgängligt. Arrende ${annualLease.toLocaleString("sv-SE")} kr/år.`,
       });
     }
   }

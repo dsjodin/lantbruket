@@ -107,6 +107,11 @@ export function calculateQuarterCosts(params: {
   // Building maintenance (quarterly)
   const buildingMaintenance = BUILDING_MAINTENANCE[farm.buildings] ?? 5000;
 
+  // Lease costs (quarterly = annual / 4)
+  const leaseCosts = fields
+    .filter((f) => f.leased && f.leaseAnnualCost)
+    .reduce((sum, f) => sum + (f.leaseAnnualCost! / 4), 0);
+
   return {
     seeds: Math.round(seeds),
     fertilizer: Math.round(fertilizer),
@@ -119,7 +124,7 @@ export function calculateQuarterCosts(params: {
     loanAmortization: Math.round(loanAmortization),
     insurance: Math.round(insurance),
     buildingMaintenance: Math.round(buildingMaintenance),
-    other: 0,
+    other: Math.round(leaseCosts),
   };
 }
 

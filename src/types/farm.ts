@@ -38,6 +38,8 @@ export interface Field {
   status: FieldStatus;
   plantedYear: number | null;
   plantedQuarter: Quarter | null;
+  leased?: boolean; // true if this field is leased (recurring cost)
+  leaseAnnualCost?: number; // yearly lease cost (charged quarterly)
 }
 
 export interface CropData {

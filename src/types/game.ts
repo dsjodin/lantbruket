@@ -14,7 +14,7 @@ export interface LandOffer {
   id: string;
   type: "buy" | "lease";
   hectares: number;
-  totalPrice: number; // Total köpesumma eller engångsarrendeavgift
+  totalPrice: number; // Köpesumma (buy) eller årlig arrendekostnad (lease)
   fieldName: string;
   soilQuality: number;
   description: string;
