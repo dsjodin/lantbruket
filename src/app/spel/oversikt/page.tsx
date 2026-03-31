@@ -185,10 +185,10 @@ export default function OversiktPage() {
                       >
                         {eff.type === "directCost" && `-${fmt(eff.value)}`}
                         {eff.type === "directIncome" && `+${fmt(eff.value)}`}
-                        {eff.type === "yieldModifier" && `Skörd ${eff.value > 0 ? "+" : ""}${Math.round(eff.value * 100)}%`}
-                        {eff.type === "priceModifier" && `Pris ${eff.value > 0 ? "+" : ""}${Math.round(eff.value * 100)}%`}
+                        {eff.type === "yieldModifier" && `${eff.target ? eff.target + ": " : ""}Skörd ${eff.value > 0 ? "+" : ""}${Math.round(eff.value * 100)}%`}
+                        {eff.type === "priceModifier" && `${eff.target ? eff.target + ": " : ""}Pris ${eff.value > 0 ? "+" : ""}${Math.round(eff.value * 100)}%`}
                         {eff.type === "costModifier" && `Kostnader +${Math.round(eff.value * 100)}%`}
-                        {eff.type === "animalHealth" && `Djurhälsa ${eff.value > 0 ? "+" : ""}${Math.round(eff.value * 100)}%`}
+                        {eff.type === "animalHealth" && `${eff.target ? eff.target + ": " : ""}Djurhälsa ${eff.value > 0 ? "+" : ""}${Math.round(eff.value * 100)}%`}
                       </span>
                     ))}
                   </div>
