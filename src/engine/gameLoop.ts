@@ -588,6 +588,45 @@ export function advanceQuarter(
     return f;
   });
 
+  // Pre-harvest: harvest any crops that are ready in the upcoming quarter
+  // so fields are available for planting when the player sees the decision screen.
+  const nextWeather = generateWeather(nextQuarter, seed, nextYear);
+  const finalFields = advancedFields.map((f) => {
+    if (!f.crop || f.status === "Oplöjd" || f.status === "Skördad") return f;
+    const cropData = CROPS_DATA[f.crop];
+    if (cropData.harvestQuarter !== nextQuarter) return f;
+    const hasPlantingData = f.plantedYear != null && f.plantedQuarter != null;
+    if (!hasPlantingData) return f;
+    const elapsed = elapsedQuarters(f.plantedYear!, f.plantedQuarter!, nextYear, nextQuarter);
+    if (elapsed < cropData.growingSeasons) return f;
+
+    // Harvest this field now
+    const tons = calculateYield(
+      f.crop, f.hectares, f.soilQuality, f.fertilizerApplied,
+      nextWeather, regionData.yieldModifier
+    );
+    const rounded = Math.round(tons * 10) / 10;
+    storage[f.crop] = (storage[f.crop] ?? 0) + rounded;
+
+    return {
+      ...f,
+      crop: null,
+      status: "Oplöjd" as const,
+      fertilizerApplied: false,
+      plantedYear: null,
+      plantedQuarter: null,
+    };
+  });
+
+  // Re-clamp storage after pre-harvest
+  const totalStoredFinal = Object.values(storage).reduce((a, b) => a + b, 0);
+  if (totalStoredFinal > siloCapacity) {
+    const scale = siloCapacity / totalStoredFinal;
+    for (const key of Object.keys(storage)) {
+      storage[key] = Math.round(storage[key] * scale * 10) / 10;
+    }
+  }
+
   const gameEnded =
     nextYear > state.totalYears && nextQuarter === Quarter.Var;
 
@@ -598,7 +637,7 @@ export function advanceQuarter(
     phase: gameEnded ? "ended" : "decisions",
     farm: {
       totalHectares: farm.totalHectares,
-      fields: advancedFields,
+      fields: finalFields,
       livestock,
       machinery,
       buildings,
