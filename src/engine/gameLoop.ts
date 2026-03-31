@@ -518,6 +518,9 @@ export function advanceQuarter(
   if (eventState.healthDelta !== 0) {
     livestock = applyHealthChange(livestock, eventState.healthDelta);
   }
+  // Track event income/costs separately for the financial record
+  const eventIncome = Math.max(0, eventState.directCashChange);
+  const eventCost = Math.max(0, -eventState.directCashChange);
   cash += eventState.directCashChange;
 
   // Apply event price modifiers to crop sales revenue
@@ -538,8 +541,9 @@ export function advanceQuarter(
     subsidyPayments,
   });
 
-  // Adjust revenue for event price modifiers and silo overflow sales
+  // Adjust revenue for event price modifiers, silo overflow sales, and event income
   revenue.cropSales = Math.round(revenue.cropSales + eventPriceAdjustment + overflowRevenue);
+  revenue.other = Math.round(revenue.other + eventIncome);
 
   // Apply event cost modifier
   const costMultiplier = 1 + eventState.costModifier;
@@ -547,6 +551,7 @@ export function advanceQuarter(
     ...costs,
     fuel: Math.round(costs.fuel * costMultiplier),
     seeds: Math.round(costs.seeds * costMultiplier),
+    other: Math.round(costs.other + eventCost),
   };
 
   const totalRevenue =
