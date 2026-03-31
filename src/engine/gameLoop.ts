@@ -257,14 +257,14 @@ export function advanceQuarter(
   }
 
   // ---- Step 2: Apply livestock actions ----
+  // NOTE: Livestock buy/sell cash changes are already handled by the store's
+  // buyLivestock/sellLivestock actions. The engine only updates herd counts here
+  // (which the store also already did, but we keep this for consistency with
+  // the engine's pure-function model). Cash is NOT modified here to avoid double-counting.
   for (const action of decisions.livestockActions) {
     const existingIdx = livestock.findIndex((h) => h.type === action.type);
 
     if (action.action === "buy") {
-      const data = LIVESTOCK_DATA[action.type];
-      const totalCost = data.purchasePrice * action.count;
-      cash -= totalCost;
-
       if (existingIdx !== -1) {
         livestock[existingIdx] = {
           ...livestock[existingIdx],
@@ -280,13 +280,10 @@ export function advanceQuarter(
       }
     } else if (action.action === "sell") {
       if (existingIdx !== -1) {
-        const data = LIVESTOCK_DATA[action.type];
-        const sellPrice = data.purchasePrice * 0.7;
         const sellCount = Math.min(
           action.count,
           livestock[existingIdx].count
         );
-        cash += sellPrice * sellCount;
         livestock[existingIdx] = {
           ...livestock[existingIdx],
           count: livestock[existingIdx].count - sellCount,

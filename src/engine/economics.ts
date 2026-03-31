@@ -59,7 +59,7 @@ export function calculateQuarterCosts(params: {
 }): CostBreakdown {
   const { farm, fields, livestock, loans, quarter } = params;
 
-  // Seed costs - only charge when field was just planted (status "Sådd")
+  // Seed and fertilizer costs - only charge once, in the planting quarter
   let seeds = 0;
   let fertilizer = 0;
 
@@ -67,13 +67,13 @@ export function calculateQuarterCosts(params: {
     if (!field.crop) continue;
     const cropData = CROPS_DATA[field.crop];
 
-    // Seeds: charge when the field is freshly sown
+    // Seeds: charge when the field is freshly sown (only in planting quarter)
     if (cropData.plantQuarter === quarter && field.status === "Sådd") {
       seeds += cropData.seedCostPerHa * field.hectares;
     }
 
-    // Fertilizer: charge if fertilizer was applied
-    if (field.fertilizerApplied) {
+    // Fertilizer: charge once in the planting quarter (same time as seeds)
+    if (field.fertilizerApplied && cropData.plantQuarter === quarter && field.status === "Sådd") {
       fertilizer += cropData.fertilizerCostPerHa * field.hectares;
     }
   }

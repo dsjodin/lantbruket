@@ -8,6 +8,7 @@ import Badge from "@/components/ui/Badge";
 import { Quarter, CropType, AnimalType, SubsidyType } from "@/types/enums";
 import { CROPS_DATA, PLANTING_QUARTERS } from "@/data/crops";
 import { LIVESTOCK_DATA } from "@/data/livestock";
+import { REGIONS_DATA } from "@/data/regions";
 
 function MessageBar() {
   const messages = useGameStore((s) => s.messages);
@@ -256,6 +257,28 @@ function AutumnDecisions() {
   );
 }
 
+function getSubsidyEstimate(type: SubsidyType, state: NonNullable<ReturnType<typeof useGameStore.getState>["state"]>): number {
+  const regionData = REGIONS_DATA[state.region];
+  const ha = state.farm.totalHectares;
+  const distinctCrops = new Set(state.farm.fields.filter(f => f.crop).map(f => f.crop));
+
+  switch (type) {
+    case "Grundbetalning": return Math.round(ha * regionData.grundbetalningPerHa);
+    case "Förgröningsstöd": return (ha > 30 && distinctCrops.size < 3) ? 0 : Math.round(ha * 700);
+    case "Kompensationsstöd": return Math.round(ha * regionData.kompensationsstodPerHa);
+    case "Miljöersättning": return Math.round(Math.floor(ha * 0.5) * 900);
+    case "Djurvälfärdsersättning": {
+      const rates: Record<string, number> = { Mjölkko: 1600, Diko: 1100, Slaktsvin: 250, Värphöns: 20, Tacka: 500 };
+      return Math.round(state.farm.livestock.reduce((s, h) => s + h.count * (rates[h.type] ?? 0), 0));
+    }
+    case "Nötkreatursstöd": {
+      const cows = state.farm.livestock.filter(h => h.type === "Mjölkko" || h.type === "Diko").reduce((s, h) => s + h.count, 0);
+      return cows * 1050;
+    }
+    default: return 0;
+  }
+}
+
 function WinterDecisions() {
   const state = useGameStore((s) => s.state)!;
   const applyForSubsidies = useGameStore((s) => s.applyForSubsidies);
@@ -271,9 +294,20 @@ function WinterDecisions() {
     "Nötkreatursstöd",
   ];
 
+  // Pre-check basic subsidies that virtually all Swedish farmers apply for
+  const defaultSubsidies: SubsidyType[] = ["Grundbetalning", "Förgröningsstöd"];
   const [applied, setApplied] = useState<SubsidyType[]>(
-    pendingDecisions.subsidyApplications || []
+    pendingDecisions.subsidyApplications.length > 0
+      ? pendingDecisions.subsidyApplications
+      : defaultSubsidies
   );
+
+  // Auto-apply defaults on first render
+  useEffect(() => {
+    if (pendingDecisions.subsidyApplications.length === 0 && applied.length > 0) {
+      applyForSubsidies(applied);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubsidyToggle = (st: SubsidyType, checked: boolean) => {
     const newApplied = checked ? [...applied, st] : applied.filter((s) => s !== st);
@@ -288,23 +322,38 @@ function WinterDecisions() {
           Ansök om stöd för att få utbetalning nästa år.
         </p>
         <div className="space-y-2">
-          {subsidyTypes.map((st) => (
-            <label key={st} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-stone-50 p-1 rounded">
-              <input
-                type="checkbox"
-                checked={applied.includes(st)}
-                onChange={(e) => handleSubsidyToggle(st, e.target.checked)}
-                className="accent-green-600 w-4 h-4"
-              />
-              {st}
-            </label>
-          ))}
+          {subsidyTypes.map((st) => {
+            const estimate = getSubsidyEstimate(st, state);
+            return (
+              <label key={st} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-stone-50 p-1 rounded">
+                <input
+                  type="checkbox"
+                  checked={applied.includes(st)}
+                  onChange={(e) => handleSubsidyToggle(st, e.target.checked)}
+                  className="accent-green-600 w-4 h-4"
+                />
+                <span className="flex-1">{st}</span>
+                {estimate > 0 && (
+                  <span className="text-xs text-green-600 font-medium">
+                    ~{estimate.toLocaleString("sv-SE")} kr
+                  </span>
+                )}
+                {estimate === 0 && (
+                  <span className="text-xs text-stone-400">ej aktuell</span>
+                )}
+              </label>
+            );
+          })}
         </div>
-        {applied.length > 0 && (
-          <div className="mt-3 p-2 bg-green-50 rounded text-sm text-green-700">
-            {applied.length} stödtyper valda
-          </div>
-        )}
+        {applied.length > 0 && (() => {
+          const totalEstimate = applied.reduce((s, st) => s + getSubsidyEstimate(st, state), 0);
+          return (
+            <div className="mt-3 p-2 bg-green-50 rounded text-sm text-green-700">
+              {applied.length} stödtyper valda — uppskattad utbetalning: <strong>{totalEstimate.toLocaleString("sv-SE")} kr</strong>
+              <div className="text-xs text-green-600 mt-1">Utbetalas nästa vår.</div>
+            </div>
+          );
+        })()}
       </Card>
 
       <Card title="Underhåll & investeringar" accent="amber">
@@ -376,11 +425,13 @@ function WinterDecisions() {
 function PlantingCard({ crops, quarter }: { crops: CropType[]; quarter: Quarter }) {
   const state = useGameStore((s) => s.state)!;
   const plantCrop = useGameStore((s) => s.plantCrop);
+  const pendingCropCosts = useGameStore((s) => s.pendingCropCosts);
 
   const [selectedCrop, setSelectedCrop] = useState<CropType>(crops[0]);
 
   const emptyFields = state.farm.fields.filter((f) => f.crop === null);
   const availableHa = emptyFields.reduce((s, f) => s + f.hectares, 0);
+  const availableCash = state.finances.cashBalance - pendingCropCosts;
 
   const label = quarter === Quarter.Var ? "Vårsådd" : "Höstsådd";
 
@@ -420,7 +471,7 @@ function PlantingCard({ crops, quarter }: { crops: CropType[]; quarter: Quarter 
             <p className="text-sm font-medium">Välj fält att plantera:</p>
             {emptyFields.map((f) => {
               const cost = CROPS_DATA[selectedCrop].seedCostPerHa * f.hectares;
-              const canAfford = state.finances.cashBalance >= cost;
+              const canAfford = availableCash >= cost;
               return (
                 <div key={f.id} className="flex justify-between items-center p-2 bg-stone-50 rounded-lg">
                   <div>
@@ -452,8 +503,10 @@ function PlantingCard({ crops, quarter }: { crops: CropType[]; quarter: Quarter 
 function FertilizeCard() {
   const state = useGameStore((s) => s.state)!;
   const fertilizeField = useGameStore((s) => s.fertilizeField);
+  const pendingCropCosts = useGameStore((s) => s.pendingCropCosts);
 
   const unfertilized = state.farm.fields.filter(f => f.crop && !f.fertilizerApplied);
+  const availableCash = state.finances.cashBalance - pendingCropCosts;
 
   return (
     <Card title="Gödsling">
@@ -466,7 +519,7 @@ function FertilizeCard() {
         <div className="space-y-2">
           {unfertilized.map(f => {
             const cost = CROPS_DATA[f.crop!].fertilizerCostPerHa * f.hectares;
-            const canAfford = state.finances.cashBalance >= cost;
+            const canAfford = availableCash >= cost;
             return (
               <div key={f.id} className="flex justify-between items-center py-2 border-b border-stone-100">
                 <div>
@@ -602,8 +655,8 @@ function PersonnelControls() {
         Nuvarande: <strong>{state.farm.employees}</strong> anställda
       </div>
       <div className="text-sm text-stone-500">
-        Lönekostnad: {(state.farm.employees * 35000).toLocaleString("sv-SE")} kr/mån
-        ({(state.farm.employees * 35000 * 3).toLocaleString("sv-SE")} kr/kvartal)
+        Lönekostnad: {(state.farm.employees * 100000).toLocaleString("sv-SE")} kr/kvartal
+        ({(state.farm.employees * 100000 * 4).toLocaleString("sv-SE")} kr/år)
       </div>
       <div className="flex gap-2">
         <Button size="sm" variant="secondary" onClick={hireWorker}>

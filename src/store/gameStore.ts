@@ -50,6 +50,7 @@ interface GameStore {
   lastQuarterResult: QuarterResult | null;
   quarterGrainSalesRevenue: number; // Tracks manual grain sales during the quarter
   quarterStartCash: number; // Cash at the start of the quarter (before manual actions)
+  pendingCropCosts: number; // Tracks seed/fertilizer costs committed this quarter (not yet deducted by engine)
 
   startGame: (params: {
     playerName: string;
@@ -91,10 +92,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   lastQuarterResult: null,
   quarterGrainSalesRevenue: 0,
   quarterStartCash: 0,
+  pendingCropCosts: 0,
 
   startGame: (params) => {
     const gameState = createInitialGameState(params);
-    set({ state: gameState, pendingDecisions: { ...emptyDecisions }, messages: [], quarterGrainSalesRevenue: 0, quarterStartCash: gameState.finances.cashBalance });
+    set({ state: gameState, pendingDecisions: { ...emptyDecisions }, messages: [], quarterGrainSalesRevenue: 0, quarterStartCash: gameState.finances.cashBalance, pendingCropCosts: 0 });
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(gameState)); } catch {}
   },
 
@@ -113,8 +115,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const cropData = CROPS_DATA[cropType];
     const seedCost = cropData.seedCostPerHa * field.hectares;
+    const availableCash = state.finances.cashBalance - get().pendingCropCosts;
 
-    if (state.finances.cashBalance < seedCost) {
+    if (availableCash < seedCost) {
       set({ messages: [{ text: `Inte tillräckligt med pengar! Kostar ${seedCost.toLocaleString("sv-SE")} kr.`, type: "error" }] });
       return;
     }
@@ -129,20 +132,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
       plantedQuarter: state.currentQuarter,
     };
 
-    // Also track in pendingDecisions for the engine
+    // Track cost for affordability checks but don't deduct cash — the engine handles actual deduction
     const pd = get().pendingDecisions;
 
     set({
       state: {
         ...state,
         farm: { ...state.farm, fields: newFields },
-        finances: { ...state.finances, cashBalance: state.finances.cashBalance - seedCost },
       },
+      pendingCropCosts: get().pendingCropCosts + seedCost,
       pendingDecisions: {
         ...pd,
         cropActions: [...pd.cropActions, { fieldId, action: "plant" as const, cropType }],
       },
-      messages: [{ text: `${cropType} planterad på ${field.hectares} ha! (-${seedCost.toLocaleString("sv-SE")} kr)`, type: "success" }],
+      messages: [{ text: `${cropType} planterad på ${field.hectares} ha! (${seedCost.toLocaleString("sv-SE")} kr dras vid kvartalsslut)`, type: "success" }],
     });
   },
 
@@ -158,8 +161,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const cropData = CROPS_DATA[field.crop];
     const fertCost = cropData.fertilizerCostPerHa * field.hectares;
+    const availableCash = state.finances.cashBalance - get().pendingCropCosts;
 
-    if (state.finances.cashBalance < fertCost) {
+    if (availableCash < fertCost) {
       set({ messages: [{ text: `Inte tillräckligt med pengar! Kostar ${fertCost.toLocaleString("sv-SE")} kr.`, type: "error" }] });
       return;
     }
@@ -167,18 +171,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const newFields = [...state.farm.fields];
     newFields[fieldIdx] = { ...field, fertilizerApplied: true };
 
+    // Track cost for affordability checks but don't deduct cash — the engine handles actual deduction
     const pd = get().pendingDecisions;
     set({
       state: {
         ...state,
         farm: { ...state.farm, fields: newFields },
-        finances: { ...state.finances, cashBalance: state.finances.cashBalance - fertCost },
       },
+      pendingCropCosts: get().pendingCropCosts + fertCost,
       pendingDecisions: {
         ...pd,
         cropActions: [...pd.cropActions, { fieldId, action: "fertilize" as const }],
       },
-      messages: [{ text: `${field.crop} gödslad! (-${fertCost.toLocaleString("sv-SE")} kr)`, type: "success" }],
+      messages: [{ text: `${field.crop} gödslad! (${fertCost.toLocaleString("sv-SE")} kr dras vid kvartalsslut)`, type: "success" }],
     });
   },
 
@@ -500,6 +505,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastQuarterResult: quarterResult,
       quarterGrainSalesRevenue: 0,
       quarterStartCash: newState.finances.cashBalance,
+      pendingCropCosts: 0,
     });
 
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(newState)); } catch {}
@@ -551,7 +557,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             : [];
         }
 
-        set({ state: gameState, pendingDecisions: { ...emptyDecisions }, quarterGrainSalesRevenue: 0, quarterStartCash: gameState.finances.cashBalance });
+        set({ state: gameState, pendingDecisions: { ...emptyDecisions }, quarterGrainSalesRevenue: 0, quarterStartCash: gameState.finances.cashBalance, pendingCropCosts: 0 });
         return true;
       }
     } catch {}
@@ -560,6 +566,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   reset: () => {
     try { localStorage.removeItem(SAVE_KEY); } catch {}
-    set({ state: null, pendingDecisions: { ...emptyDecisions }, messages: [], showQuarterSummary: false, lastQuarterResult: null, quarterGrainSalesRevenue: 0, quarterStartCash: 0 });
+    set({ state: null, pendingDecisions: { ...emptyDecisions }, messages: [], showQuarterSummary: false, lastQuarterResult: null, quarterGrainSalesRevenue: 0, quarterStartCash: 0, pendingCropCosts: 0 });
   },
 }));
