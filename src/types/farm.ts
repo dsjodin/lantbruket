@@ -7,6 +7,15 @@ import {
 } from "./enums";
 import { LivestockHerd } from "./livestock";
 
+export interface Machine {
+  id: string;
+  name: string;
+  type: "traktor" | "plog" | "harv" | "saamaskin" | "troska" | "spruta";
+  purchaseYear: number;
+  condition: number; // 0.0 - 1.0
+  maintenanceCostPerQuarter: number;
+}
+
 export interface Farm {
   totalHectares: number;
   fields: Field[];
@@ -16,6 +25,7 @@ export interface Farm {
   employees: number;
   storage: Record<string, number>; // ton lagrad spannmål per CropType
   siloCapacity: number; // max ton totalt
+  machines: Machine[];
 }
 
 export interface Field {

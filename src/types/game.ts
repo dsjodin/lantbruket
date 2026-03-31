@@ -10,6 +10,16 @@ import { Farm } from "./farm";
 import { Finances } from "./economics";
 import { GameEvent, QuarterRecord } from "./events";
 
+export interface LandOffer {
+  id: string;
+  type: "buy" | "lease";
+  hectares: number;
+  totalPrice: number; // Total köpesumma eller engångsarrendeavgift
+  fieldName: string;
+  soilQuality: number;
+  description: string;
+}
+
 export interface GameState {
   id: string;
   playerName: string;
@@ -25,6 +35,7 @@ export interface GameState {
   activeEvents: GameEvent[];
   seed: number; // För slumpmässig men reproducerbar händelsegenerering
   currentMarketPrices: Record<string, number>; // Aktuella marknadspriser per CropType
+  pendingLandOffers: LandOffer[];
 }
 
 export interface QuarterDecisions {

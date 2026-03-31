@@ -6,6 +6,7 @@
 import {
   type GameState,
   type QuarterDecisions,
+  type LandOffer,
   Quarter,
   Region,
   CropType,
@@ -21,7 +22,7 @@ import {
 import { CROPS_DATA } from "@/data/crops";
 import { LIVESTOCK_DATA } from "@/data/livestock";
 import { REGIONS_DATA } from "@/data/regions";
-import { MACHINERY_UPGRADES, BUILDING_UPGRADES } from "@/data/machinery";
+import { MACHINERY_UPGRADES, BUILDING_UPGRADES, STARTER_MACHINES } from "@/data/machinery";
 
 import { createRandom } from "@/lib/random";
 import { generateWeather } from "./weather";
@@ -174,6 +175,7 @@ export function createInitialGameState(params: {
       employees: 1,
       storage: {},
       siloCapacity: Math.round(totalHectares * 5), // ~5 ton/ha kapacitet
+      machines: STARTER_MACHINES[MachineryLevel.Basic].map((m) => ({ ...m, purchaseYear: 1 })),
     },
     finances: {
       cashBalance: startingCapital + loanAmount,
@@ -184,6 +186,7 @@ export function createInitialGameState(params: {
     activeEvents: [],
     seed,
     currentMarketPrices: generateMarketPrices(seed, 1, Quarter.Var),
+    pendingLandOffers: [],
   };
 }
 
@@ -313,11 +316,15 @@ export function advanceQuarter(
   let machinery = farm.machinery;
   let buildings = farm.buildings;
 
+  let machines = (farm.machines || []).map((m) => ({ ...m }));
+
   if (decisions.machineryUpgrade) {
     const upgrade = MACHINERY_UPGRADES.find((u) => u.from === machinery);
     if (upgrade) {
       cash -= upgrade.cost;
       machinery = upgrade.to;
+      // Replace machines with the new level's set
+      machines = STARTER_MACHINES[upgrade.to].map((m) => ({ ...m, purchaseYear: currentYear }));
     }
   }
 
@@ -438,6 +445,7 @@ export function advanceQuarter(
       employees: newEmployees,
       storage,
       siloCapacity,
+      machines,
     };
     const newSubsidies = calculateSubsidies(
       updatedFarm,
@@ -474,6 +482,7 @@ export function advanceQuarter(
     employees: newEmployees,
     storage,
     siloCapacity,
+    machines,
   };
 
   const costs = calculateQuarterCosts({
@@ -659,6 +668,53 @@ export function advanceQuarter(
   const gameEnded =
     nextYear > state.totalYears && nextQuarter === Quarter.Var;
 
+  // Degrade machine condition each quarter
+  machines = machines.map((m) => ({
+    ...m,
+    condition: Math.max(0.1, Math.round((m.condition - 0.02) * 100) / 100),
+    maintenanceCostPerQuarter: m.condition < 0.4
+      ? Math.round(m.maintenanceCostPerQuarter * 1.5)
+      : m.maintenanceCostPerQuarter,
+  }));
+
+  // Generate land offers (~10% chance per quarter, only in Vår and Höst)
+  const landOffers: LandOffer[] = [];
+  if (!gameEnded && (nextQuarter === Quarter.Var || nextQuarter === Quarter.Host)) {
+    const landRng = createRandom(seed + nextYear * 97 + (nextQuarter === Quarter.Var ? 1 : 3) * 71);
+    const offerFieldNames = [
+      "Ekbacken", "Ängsholmen", "Norrskogen", "Sjöängen", "Lindgården",
+      "Björkudden", "Sandviken", "Hagalund", "Tallåsen", "Granliden",
+    ];
+    if (landRng.chance(0.12)) {
+      const ha = Math.round(10 + landRng.next() * 30); // 10-40 ha
+      const pricePerHa = Math.round(35000 + landRng.next() * 30000); // 35k-65k kr/ha
+      const nameIdx = Math.floor(landRng.next() * offerFieldNames.length);
+      landOffers.push({
+        id: `land-buy-${nextYear}-${nextQuarter}`,
+        type: "buy",
+        hectares: ha,
+        totalPrice: ha * pricePerHa,
+        fieldName: offerFieldNames[nameIdx],
+        soilQuality: Math.round((0.8 + landRng.next() * 0.3) * 100) / 100,
+        description: `Granngården "${offerFieldNames[nameIdx]}" med ${ha} ha mark är till salu. Priset är ${(ha * pricePerHa).toLocaleString("sv-SE")} kr.`,
+      });
+    }
+    if (landRng.chance(0.10)) {
+      const ha = Math.round(5 + landRng.next() * 20); // 5-25 ha
+      const leasePrice = Math.round(ha * (2000 + landRng.next() * 3000)); // 2k-5k kr/ha
+      const nameIdx = Math.floor(landRng.next() * offerFieldNames.length);
+      landOffers.push({
+        id: `land-lease-${nextYear}-${nextQuarter}`,
+        type: "lease",
+        hectares: ha,
+        totalPrice: leasePrice,
+        fieldName: offerFieldNames[nameIdx],
+        soilQuality: Math.round((0.75 + landRng.next() * 0.3) * 100) / 100,
+        description: `${ha} ha arrendemark vid "${offerFieldNames[nameIdx]}" finns tillgängligt. Engångskostnad ${leasePrice.toLocaleString("sv-SE")} kr.`,
+      });
+    }
+  }
+
   return {
     ...state,
     currentYear: nextYear,
@@ -673,6 +729,7 @@ export function advanceQuarter(
       employees: newEmployees,
       storage,
       siloCapacity,
+      machines,
     },
     finances: {
       cashBalance: Math.round(cash),
@@ -683,5 +740,6 @@ export function advanceQuarter(
     activeEvents: events,
     seed: state.seed,
     currentMarketPrices: marketPrices,
+    pendingLandOffers: landOffers,
   };
 }

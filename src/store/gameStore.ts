@@ -9,6 +9,7 @@ import {
   createInitialGameState,
   advanceQuarter,
 } from "@/engine/gameLoop";
+import { STARTER_MACHINES } from "@/data/machinery";
 
 const SAVE_KEY = "lantbruket-save";
 
@@ -68,6 +69,8 @@ interface GameStore {
   fireWorker: () => void;
   applyForSubsidies: (types: SubsidyType[]) => void;
   takeLoan: (amount: number, termYears: number, interestRate: number) => void;
+  acceptLandOffer: (offerId: string) => void;
+  declineLandOffer: (offerId: string) => void;
 
   updateDecisions: (partial: Partial<QuarterDecisions>) => void;
   advanceQuarter: () => void;
@@ -332,6 +335,74 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
+  acceptLandOffer: (offerId) => {
+    const { state } = get();
+    if (!state) return;
+
+    const offer = (state.pendingLandOffers || []).find((o) => o.id === offerId);
+    if (!offer) return;
+
+    if (state.finances.cashBalance < offer.totalPrice) {
+      set({ messages: [{ text: `Inte tillräckligt med pengar! Kostar ${offer.totalPrice.toLocaleString("sv-SE")} kr.`, type: "error" }] });
+      return;
+    }
+
+    // Create new fields from the offer
+    const newFields: { id: string; name: string; hectares: number; crop: null; soilQuality: number; fertilizerApplied: boolean; status: "Oplöjd"; plantedYear: null; plantedQuarter: null }[] = [];
+    const fieldCount = offer.hectares > 15 ? 2 : 1;
+    for (let i = 0; i < fieldCount; i++) {
+      const ha = i === fieldCount - 1
+        ? offer.hectares - newFields.reduce((s, f) => s + f.hectares, 0)
+        : Math.round(offer.hectares / fieldCount);
+      newFields.push({
+        id: `field-${state.farm.fields.length + i + 1}`,
+        name: `${offer.fieldName} ${fieldCount > 1 ? (i + 1) : ""}`.trim(),
+        hectares: ha,
+        crop: null,
+        soilQuality: offer.soilQuality,
+        fertilizerApplied: false,
+        status: "Oplöjd" as const,
+        plantedYear: null,
+        plantedQuarter: null,
+      });
+    }
+
+    const updatedOffers = (state.pendingLandOffers || []).filter((o) => o.id !== offerId);
+    const newTotalHa = state.farm.totalHectares + offer.hectares;
+
+    set({
+      state: {
+        ...state,
+        farm: {
+          ...state.farm,
+          totalHectares: newTotalHa,
+          fields: [...state.farm.fields, ...newFields],
+          siloCapacity: Math.round(newTotalHa * 5),
+        },
+        finances: {
+          ...state.finances,
+          cashBalance: state.finances.cashBalance - offer.totalPrice,
+        },
+        pendingLandOffers: updatedOffers,
+      },
+      messages: [{
+        text: `${offer.type === "buy" ? "Köpt" : "Arrenderat"} ${offer.hectares} ha mark (${offer.fieldName})! (-${offer.totalPrice.toLocaleString("sv-SE")} kr)`,
+        type: "success",
+      }],
+    });
+  },
+
+  declineLandOffer: (offerId) => {
+    const { state } = get();
+    if (!state) return;
+
+    const updatedOffers = (state.pendingLandOffers || []).filter((o) => o.id !== offerId);
+    set({
+      state: { ...state, pendingLandOffers: updatedOffers },
+      messages: [{ text: "Erbjudandet avböjt.", type: "info" }],
+    });
+  },
+
   updateDecisions: (partial) => {
     const current = get().pendingDecisions;
     set({ pendingDecisions: { ...current, ...partial } });
@@ -432,6 +503,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         // Migrate: add missing currentMarketPrices
         if (!gameState.currentMarketPrices) gameState.currentMarketPrices = {};
+
+        // Migrate: add missing pendingLandOffers
+        if (!gameState.pendingLandOffers) gameState.pendingLandOffers = [];
+
+        // Migrate: add missing machines array
+        if (!gameState.farm.machines) {
+          const starterSet = STARTER_MACHINES[gameState.farm.machinery];
+          gameState.farm.machines = starterSet
+            ? starterSet.map((m) => ({ ...m, purchaseYear: gameState.currentYear }))
+            : [];
+        }
 
         set({ state: gameState, pendingDecisions: { ...emptyDecisions } });
         return true;

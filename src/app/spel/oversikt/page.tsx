@@ -6,6 +6,7 @@ import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { Quarter } from "@/types/enums";
 import { calculateScore } from "@/engine/scoring";
+import FarmMap from "@/components/game/FarmMap";
 import {
   LineChart,
   Line,
@@ -221,6 +222,11 @@ export default function OversiktPage() {
         </div>
       </Card>
 
+      {/* Farm map */}
+      <Card title="Gårdskarta">
+        <FarmMap fields={farm.fields} compact />
+      </Card>
+
       {/* Grain storage */}
       {(() => {
         const storage = farm.storage || {};
@@ -295,6 +301,35 @@ export default function OversiktPage() {
                 <Line type="monotone" dataKey="Resultat" stroke="#2563eb" strokeWidth={2} strokeDasharray="5 5" />
               </LineChart>
             </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
+
+      {/* Machinery */}
+      {(farm.machines || []).length > 0 && (
+        <Card title="Maskinpark">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {(farm.machines || []).map((m) => {
+              const condColor = m.condition > 0.7 ? "text-green-600" : m.condition > 0.4 ? "text-amber-600" : "text-red-600";
+              const age = currentYear - m.purchaseYear;
+              return (
+                <div key={m.id} className="bg-stone-50 p-2 rounded text-sm">
+                  <div className="font-medium">{m.name}</div>
+                  <div className="flex justify-between text-xs mt-1">
+                    <span className={condColor}>
+                      {Math.round(m.condition * 100)}% skick
+                    </span>
+                    <span className="text-stone-400">{age > 0 ? `${age} år` : "Ny"}</span>
+                  </div>
+                  <div className="w-full bg-stone-200 rounded-full h-1.5 mt-1">
+                    <div
+                      className={`h-1.5 rounded-full ${m.condition > 0.7 ? "bg-green-500" : m.condition > 0.4 ? "bg-amber-500" : "bg-red-500"}`}
+                      style={{ width: `${m.condition * 100}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}

@@ -60,10 +60,70 @@ export default function BeslutPage() {
 
       <MessageBar />
 
+      <LandOffersCard />
+
       {currentQuarter === Quarter.Var && <SpringDecisions />}
       {currentQuarter === Quarter.Sommar && <SummerDecisions />}
       {currentQuarter === Quarter.Host && <AutumnDecisions />}
       {currentQuarter === Quarter.Vinter && <WinterDecisions />}
+    </div>
+  );
+}
+
+function LandOffersCard() {
+  const state = useGameStore((s) => s.state)!;
+  const acceptLandOffer = useGameStore((s) => s.acceptLandOffer);
+  const declineLandOffer = useGameStore((s) => s.declineLandOffer);
+
+  const offers = state.pendingLandOffers || [];
+  if (offers.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      {offers.map((offer) => {
+        const canAfford = state.finances.cashBalance >= offer.totalPrice;
+        const pricePerHa = Math.round(offer.totalPrice / offer.hectares);
+        return (
+          <div
+            key={offer.id}
+            className="bg-amber-50 border border-amber-200 rounded-lg p-4"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🏡</span>
+                  <span className="font-semibold text-stone-800">
+                    {offer.type === "buy" ? "Mark till salu" : "Arrendemark tillgänglig"}
+                  </span>
+                </div>
+                <p className="text-sm text-stone-600 mt-1">{offer.description}</p>
+                <div className="flex gap-4 mt-2 text-xs text-stone-500">
+                  <span>{offer.hectares} ha</span>
+                  <span>Jordkvalitet: {Math.round(offer.soilQuality * 100)}%</span>
+                  <span>{pricePerHa.toLocaleString("sv-SE")} kr/ha</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <Button
+                size="sm"
+                onClick={() => acceptLandOffer(offer.id)}
+                disabled={!canAfford}
+              >
+                {offer.type === "buy" ? "Köp" : "Arrendera"} ({offer.totalPrice.toLocaleString("sv-SE")} kr)
+                {!canAfford && " — ej råd"}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => declineLandOffer(offer.id)}
+              >
+                Avböj
+              </Button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -250,24 +310,42 @@ function WinterDecisions() {
             <span className="text-stone-500">Maskinpark:</span>{" "}
             <span className="font-medium">{state.farm.machinery}</span>
           </div>
-          <div className="text-sm">
+          {(state.farm.machines || []).length > 0 && (
+            <div className="space-y-1.5">
+              {(state.farm.machines || []).map((m) => {
+                const condColor = m.condition > 0.7 ? "text-green-600" : m.condition > 0.4 ? "text-amber-600" : "text-red-600";
+                return (
+                  <div key={m.id} className="flex justify-between items-center text-sm py-1 border-b border-stone-100">
+                    <span>{m.name}</span>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs ${condColor}`}>{Math.round(m.condition * 100)}%</span>
+                      <span className="text-xs text-stone-400">{m.maintenanceCostPerQuarter.toLocaleString("sv-SE")} kr/kv</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="text-sm mt-2">
             <span className="text-stone-500">Byggnader:</span>{" "}
             <span className="font-medium">{state.farm.buildings}</span>
           </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => updateDecisions({ machineryUpgrade: true })}
-          >
-            Uppgradera maskiner
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => updateDecisions({ buildingUpgrade: true })}
-          >
-            Uppgradera byggnader
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => updateDecisions({ machineryUpgrade: true })}
+            >
+              Uppgradera maskiner
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => updateDecisions({ buildingUpgrade: true })}
+            >
+              Uppgradera byggnader
+            </Button>
+          </div>
         </div>
       </Card>
 

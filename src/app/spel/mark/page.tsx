@@ -3,6 +3,7 @@
 import { useGameStore } from "@/store/gameStore";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
+import FarmMap from "@/components/game/FarmMap";
 
 const statusColors: Record<string, "green" | "amber" | "blue" | "stone" | "red"> = {
   "Oplöjd": "stone",
@@ -37,6 +38,25 @@ export default function MarkPage() {
           <div className="text-xl font-bold">{farm.totalHectares - usedHa} ha</div>
         </Card>
       </div>
+
+      {/* Farm map */}
+      <Card title="Gårdskarta">
+        <FarmMap fields={farm.fields} />
+        <div className="flex flex-wrap gap-3 mt-3 text-xs">
+          {[
+            { label: "Oplöjd", color: "#a08060" },
+            { label: "Sådd", color: "#c4b078" },
+            { label: "Växande", color: "#4ade80" },
+            { label: "Skördeklar", color: "#fbbf24" },
+            { label: "Skördad", color: "#d6d3d1" },
+          ].map((s) => (
+            <div key={s.label} className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: s.color }} />
+              <span className="text-stone-500">{s.label}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {/* Grain storage */}
       {(() => {
