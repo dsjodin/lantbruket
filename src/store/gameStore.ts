@@ -48,6 +48,8 @@ interface GameStore {
   messages: { text: string; type: "success" | "error" | "info" }[];
   showQuarterSummary: boolean;
   lastQuarterResult: QuarterResult | null;
+  quarterGrainSalesRevenue: number; // Tracks manual grain sales during the quarter
+  quarterStartCash: number; // Cash at the start of the quarter (before manual actions)
 
   startGame: (params: {
     playerName: string;
@@ -87,10 +89,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   messages: [],
   showQuarterSummary: false,
   lastQuarterResult: null,
+  quarterGrainSalesRevenue: 0,
+  quarterStartCash: 0,
 
   startGame: (params) => {
     const gameState = createInitialGameState(params);
-    set({ state: gameState, pendingDecisions: { ...emptyDecisions }, messages: [] });
+    set({ state: gameState, pendingDecisions: { ...emptyDecisions }, messages: [], quarterGrainSalesRevenue: 0, quarterStartCash: gameState.finances.cashBalance });
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(gameState)); } catch {}
   },
 
@@ -203,6 +207,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         farm: { ...state.farm, storage: newStorage },
         finances: { ...state.finances, cashBalance: state.finances.cashBalance + revenue },
       },
+      quarterGrainSalesRevenue: get().quarterGrainSalesRevenue + revenue,
       messages: [{
         text: `Sålt ${tons.toFixed(1)} ton ${cropType} à ${pricePerTon.toLocaleString("sv-SE")} kr/ton = +${revenue.toLocaleString("sv-SE")} kr!`,
         type: "success",
@@ -411,10 +416,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   clearMessages: () => set({ messages: [] }),
 
   advanceQuarter: () => {
-    const { state, pendingDecisions } = get();
+    const { state, pendingDecisions, quarterGrainSalesRevenue } = get();
     if (!state || state.phase !== "decisions") return;
 
-    const previousCash = state.finances.cashBalance;
+    const previousCash = get().quarterStartCash;
     const previousStorage = { ...(state.farm.storage || {}) };
     const previousMarketPrices = { ...(state.currentMarketPrices || {}) };
 
@@ -446,9 +451,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       })),
       harvestedCrops,
       financialRecord: latestRecord ? {
-        revenue: { ...latestRecord.financialRecord.revenue },
+        revenue: {
+          ...latestRecord.financialRecord.revenue,
+          cropSales: latestRecord.financialRecord.revenue.cropSales + quarterGrainSalesRevenue,
+        },
         costs: { ...latestRecord.financialRecord.costs },
-        netResult: latestRecord.financialRecord.netResult,
+        netResult: latestRecord.financialRecord.netResult + quarterGrainSalesRevenue,
       } : {
         revenue: { cropSales: 0, livestockIncome: 0, subsidies: 0, other: 0 },
         costs: { seeds: 0, fertilizer: 0, fuel: 0, machinery: 0, feed: 0, veterinary: 0, salaries: 0, loanInterest: 0, loanAmortization: 0, insurance: 0, buildingMaintenance: 0, other: 0 },
@@ -464,6 +472,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       messages: [],
       showQuarterSummary: true,
       lastQuarterResult: quarterResult,
+      quarterGrainSalesRevenue: 0,
+      quarterStartCash: newState.finances.cashBalance,
     });
 
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(newState)); } catch {}
@@ -515,7 +525,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             : [];
         }
 
-        set({ state: gameState, pendingDecisions: { ...emptyDecisions } });
+        set({ state: gameState, pendingDecisions: { ...emptyDecisions }, quarterGrainSalesRevenue: 0, quarterStartCash: gameState.finances.cashBalance });
         return true;
       }
     } catch {}
@@ -524,6 +534,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   reset: () => {
     try { localStorage.removeItem(SAVE_KEY); } catch {}
-    set({ state: null, pendingDecisions: { ...emptyDecisions }, messages: [], showQuarterSummary: false, lastQuarterResult: null });
+    set({ state: null, pendingDecisions: { ...emptyDecisions }, messages: [], showQuarterSummary: false, lastQuarterResult: null, quarterGrainSalesRevenue: 0, quarterStartCash: 0 });
   },
 }));
