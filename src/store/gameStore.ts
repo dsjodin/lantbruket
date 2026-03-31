@@ -41,7 +41,7 @@ interface GameStore {
   // Direct actions that immediately update game state
   plantCrop: (fieldId: string, cropType: CropType) => void;
   fertilizeField: (fieldId: string) => void;
-  harvestField: (fieldId: string) => void;
+  sellGrain: (cropType: CropType, tons: number) => void;
   buyLivestock: (type: AnimalType, count: number) => void;
   sellLivestock: (type: AnimalType, count: number) => void;
   hireWorker: () => void;
@@ -90,7 +90,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     const newFields = [...state.farm.fields];
-    newFields[fieldIdx] = { ...field, crop: cropType, status: "Sådd", fertilizerApplied: false };
+    newFields[fieldIdx] = {
+      ...field,
+      crop: cropType,
+      status: "Sådd",
+      fertilizerApplied: false,
+      plantedYear: state.currentYear,
+      plantedQuarter: state.currentQuarter,
+    };
 
     // Also track in pendingDecisions for the engine
     const pd = get().pendingDecisions;
@@ -145,30 +152,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  harvestField: (fieldId) => {
+  sellGrain: (cropType, tons) => {
     const { state } = get();
-    if (!state) return;
+    if (!state || tons <= 0) return;
 
-    const fieldIdx = state.farm.fields.findIndex((f) => f.id === fieldId);
-    if (fieldIdx === -1) return;
+    const storage = state.farm.storage || {};
+    const available = storage[cropType] ?? 0;
 
-    const field = state.farm.fields[fieldIdx];
-    if (!field.crop) return;
+    if (available < tons) {
+      set({ messages: [{ text: `Inte tillräckligt i lager! Har ${available.toFixed(1)} ton ${cropType}.`, type: "error" }] });
+      return;
+    }
 
-    const newFields = [...state.farm.fields];
-    newFields[fieldIdx] = { ...field, status: "Skördad" };
+    const pricePerTon = state.currentMarketPrices?.[cropType] ?? 0;
+    const revenue = Math.round(tons * pricePerTon);
 
-    const pd = get().pendingDecisions;
+    const newStorage = { ...storage, [cropType]: Math.round((available - tons) * 10) / 10 };
+    // Remove zero entries
+    if (newStorage[cropType] <= 0) delete newStorage[cropType];
+
     set({
       state: {
         ...state,
-        farm: { ...state.farm, fields: newFields },
+        farm: { ...state.farm, storage: newStorage },
+        finances: { ...state.finances, cashBalance: state.finances.cashBalance + revenue },
       },
-      pendingDecisions: {
-        ...pd,
-        cropActions: [...pd.cropActions, { fieldId, action: "harvest" as const }],
-      },
-      messages: [{ text: `${field.crop} skördad på ${field.hectares} ha!`, type: "success" }],
+      messages: [{
+        text: `Sålt ${tons.toFixed(1)} ton ${cropType} à ${pricePerTon.toLocaleString("sv-SE")} kr/ton = +${revenue.toLocaleString("sv-SE")} kr!`,
+        type: "success",
+      }],
     });
   },
 
@@ -308,17 +320,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { state, pendingDecisions } = get();
     if (!state || state.phase !== "decisions") return;
 
-    // Auto-sell all harvested crops
-    const sellCrops = { ...pendingDecisions.sellCrops };
-    for (const field of state.farm.fields) {
-      if (field.crop && (field.status === "Skördeklar" || field.status === "Skördad")) {
-        const cropType = field.crop as CropType;
-        sellCrops[cropType] = (sellCrops[cropType] || 0) + 999;
-      }
-    }
-
-    const decisions: QuarterDecisions = { ...pendingDecisions, sellCrops };
-    const newState = advanceQuarter(state, decisions);
+    // No auto-sell: grain stays in storage until player manually sells
+    const newState = advanceQuarter(state, pendingDecisions);
 
     set({
       state: newState,
@@ -341,6 +344,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const saved = localStorage.getItem(SAVE_KEY);
       if (saved) {
         const gameState = JSON.parse(saved) as GameState;
+
+        // Migrate old saves: add missing plantedYear/plantedQuarter
+        for (const field of gameState.farm.fields) {
+          if (field.crop && (field.plantedYear === undefined || field.plantedYear === null)) {
+            const cropData = CROPS_DATA[field.crop as CropType];
+            field.plantedQuarter = cropData.plantQuarter;
+            field.plantedYear = Math.max(1, gameState.currentYear - 1);
+          }
+          if (field.plantedYear === undefined) field.plantedYear = null;
+          if (field.plantedQuarter === undefined) field.plantedQuarter = null;
+        }
+
+        // Migrate: add missing storage/siloCapacity
+        if (!gameState.farm.storage) gameState.farm.storage = {};
+        if (!gameState.farm.siloCapacity) gameState.farm.siloCapacity = 500;
+
+        // Migrate: add missing currentMarketPrices
+        if (!gameState.currentMarketPrices) gameState.currentMarketPrices = {};
+
         set({ state: gameState, pendingDecisions: { ...emptyDecisions } });
         return true;
       }

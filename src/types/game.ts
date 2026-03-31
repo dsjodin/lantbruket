@@ -24,6 +24,7 @@ export interface GameState {
   history: QuarterRecord[];
   activeEvents: GameEvent[];
   seed: number; // För slumpmässig men reproducerbar händelsegenerering
+  currentMarketPrices: Record<string, number>; // Aktuella marknadspriser per CropType
 }
 
 export interface QuarterDecisions {

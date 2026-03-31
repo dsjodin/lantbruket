@@ -70,7 +70,6 @@ export default function BeslutPage() {
 
 function SpringDecisions() {
   const state = useGameStore((s) => s.state)!;
-  const { farm } = state;
 
   const springCrops = Object.values(CropType).filter(
     (c) => c !== CropType.Trada && PLANTING_QUARTERS[c]?.includes(Quarter.Var)
@@ -84,6 +83,7 @@ function SpringDecisions() {
         <LivestockBuyer />
       </Card>
 
+      <GrainSalesCard />
       <FertilizeCard />
 
       <Card title="Personal">
@@ -121,6 +121,8 @@ function SummerDecisions() {
 
       <FertilizeCard />
 
+      <GrainSalesCard />
+
       <Card title="Djurskötsel">
         <div className="space-y-2">
           {state.farm.livestock.length === 0 ? (
@@ -143,9 +145,8 @@ function SummerDecisions() {
 
 function AutumnDecisions() {
   const state = useGameStore((s) => s.state)!;
-  const harvestField = useGameStore((s) => s.harvestField);
 
-  const harvestableFields = state.farm.fields.filter(
+  const growingFields = state.farm.fields.filter(
     (f) => f.crop && f.status !== "Skördad" && f.status !== "Oplöjd"
   );
 
@@ -157,56 +158,36 @@ function AutumnDecisions() {
     <div className="grid md:grid-cols-2 gap-4">
       <Card title="Skörd" accent="orange">
         <p className="text-sm text-stone-500 mb-3">
-          Skörda dina grödor. Försäljning sker automatiskt vid kvartalsskifte.
+          Grödorna skördas automatiskt vid kvartalsskifte och lagras i silon.
+          Sälj sedan spannmål när marknadspriset passar dig.
         </p>
-        {harvestableFields.length === 0 ? (
-          <p className="text-sm text-stone-400">Inga grödor att skörda.</p>
+        {growingFields.length === 0 ? (
+          <p className="text-sm text-stone-400">Inga grödor att skörda detta kvartal.</p>
         ) : (
           <div className="space-y-2">
-            {harvestableFields.map((f) => (
+            {growingFields.map((f) => (
               <div key={f.id} className="flex justify-between items-center py-2 border-b border-stone-100">
                 <div>
-                  <span className="text-sm font-medium">{f.crop}</span>
-                  <span className="text-xs text-stone-400 ml-2">{f.hectares} ha - {f.status}</span>
+                  <span className="text-sm font-medium">{f.name}</span>
+                  <span className="text-xs text-stone-400 ml-2">
+                    {f.crop} — {f.hectares} ha
+                  </span>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => harvestField(f.id)}
-                  disabled={f.status === "Skördad"}
-                >
-                  Skörda
-                </Button>
+                <Badge color={f.status === "Växande" ? "green" : f.status === "Skördeklar" ? "amber" : "blue"}>
+                  {f.status}
+                </Badge>
               </div>
             ))}
           </div>
         )}
       </Card>
 
+      <GrainSalesCard />
+
       <PlantingCard crops={autumnCrops} quarter={Quarter.Host} />
 
       <Card title="Sälj djur">
         <LivestockSeller />
-      </Card>
-
-      <Card title="Ekonomisk sammanfattning">
-        <div className="text-sm space-y-2">
-          <div className="flex justify-between">
-            <span className="text-stone-500">Kassa:</span>
-            <span className={`font-medium ${state.finances.cashBalance >= 0 ? "text-green-700" : "text-red-600"}`}>
-              {state.finances.cashBalance.toLocaleString("sv-SE")} kr
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-stone-500">Lån kvar:</span>
-            <span className="font-medium text-red-600">
-              {state.finances.loans.reduce((s, l) => s + l.remainingPrincipal, 0).toLocaleString("sv-SE")} kr
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-stone-500">Djur:</span>
-            <span className="font-medium">{state.farm.livestock.reduce((s, h) => s + h.count, 0)} st</span>
-          </div>
-        </div>
       </Card>
     </div>
   );
@@ -289,6 +270,8 @@ function WinterDecisions() {
           </Button>
         </div>
       </Card>
+
+      <GrainSalesCard />
 
       <Card title="Planering">
         <p className="text-sm text-stone-500">
@@ -555,5 +538,97 @@ function PersonnelControls() {
         </Button>
       </div>
     </div>
+  );
+}
+
+function GrainSalesCard() {
+  const state = useGameStore((s) => s.state)!;
+  const sellGrain = useGameStore((s) => s.sellGrain);
+  const [sellAmounts, setSellAmounts] = useState<Record<string, number>>({});
+
+  const storage = state.farm.storage || {};
+  const prices = state.currentMarketPrices || {};
+  const totalStored = Object.values(storage).reduce((a, b) => a + b, 0);
+  const siloCapacity = state.farm.siloCapacity || 500;
+
+  const storedCrops = Object.entries(storage).filter(([, tons]) => tons > 0);
+
+  return (
+    <Card title="Spannmålslager & Försäljning" accent="amber">
+      <div className="mb-3">
+        <div className="flex justify-between text-sm mb-1">
+          <span className="text-stone-500">Silo</span>
+          <span className="font-medium">{totalStored.toFixed(0)} / {siloCapacity} ton</span>
+        </div>
+        <div className="w-full bg-stone-200 rounded-full h-2.5">
+          <div
+            className={`h-2.5 rounded-full ${totalStored / siloCapacity > 0.9 ? "bg-red-500" : "bg-amber-500"}`}
+            style={{ width: `${Math.min(100, (totalStored / siloCapacity) * 100)}%` }}
+          />
+        </div>
+      </div>
+
+      {storedCrops.length === 0 ? (
+        <p className="text-sm text-stone-400">
+          Inget lagrat. Grödorna hamnar här automatiskt efter skörd.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {storedCrops.map(([crop, tons]) => {
+            const price = prices[crop] ?? 0;
+            const amount = sellAmounts[crop] ?? Math.round(tons);
+            const clampedAmount = Math.min(amount, tons);
+            const estimatedRevenue = Math.round(clampedAmount * price);
+
+            return (
+              <div key={crop} className="p-2 bg-stone-50 rounded-lg space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">{crop}</span>
+                  <span className="text-xs text-stone-500">{tons.toFixed(1)} ton i lager</span>
+                </div>
+
+                <div className="text-xs text-stone-500">
+                  Marknadspris: <strong className="text-stone-700">{price.toLocaleString("sv-SE")} kr/ton</strong>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.ceil(tons)}
+                    step={1}
+                    value={clampedAmount}
+                    onChange={(e) => setSellAmounts({ ...sellAmounts, [crop]: Number(e.target.value) })}
+                    className="flex-1 accent-amber-600"
+                  />
+                  <span className="text-xs w-16 text-right">{clampedAmount} ton</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-green-700">
+                    = {estimatedRevenue.toLocaleString("sv-SE")} kr
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      sellGrain(crop as CropType, clampedAmount);
+                      setSellAmounts({ ...sellAmounts, [crop]: 0 });
+                    }}
+                    disabled={clampedAmount <= 0}
+                  >
+                    Sälj
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-3 bg-blue-50 p-2 rounded text-xs text-blue-700">
+        <strong>Tips:</strong> Marknadspriserna ändras varje kvartal. Du kan vänta
+        med att sälja om du tror att priset stiger!
+      </div>
+    </Card>
   );
 }

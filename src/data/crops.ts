@@ -4,12 +4,13 @@ import { CropData } from "@/types/farm";
 export const CROPS_DATA: Record<CropType, CropData> = {
   [CropType.Hostvete]: {
     type: CropType.Hostvete,
-    baseYieldPerHa: 7.0, // ton per hektar
+    baseYieldPerHa: 7.0,
     seedCostPerHa: 1200,
     fertilizerCostPerHa: 2500,
     harvestCostPerHa: 800,
     plantQuarter: Quarter.Host,
-    harvestQuarter: Quarter.Host, // skördas hösten året efter
+    harvestQuarter: Quarter.Host, // skördas hösten NÄSTA år
+    growingSeasons: 4, // Höst→Vinter→Vår→Sommar→Höst
   },
   [CropType.Varkorn]: {
     type: CropType.Varkorn,
@@ -19,6 +20,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 700,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
+    growingSeasons: 2, // Vår→Sommar→Höst
   },
   [CropType.Havre]: {
     type: CropType.Havre,
@@ -28,6 +30,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 700,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
+    growingSeasons: 2,
   },
   [CropType.Hostraps]: {
     type: CropType.Hostraps,
@@ -36,7 +39,8 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     fertilizerCostPerHa: 3000,
     harvestCostPerHa: 900,
     plantQuarter: Quarter.Host,
-    harvestQuarter: Quarter.Sommar, // skördas sommaren året efter
+    harvestQuarter: Quarter.Sommar, // skördas juli nästa år
+    growingSeasons: 3, // Höst→Vinter→Vår→Sommar
   },
   [CropType.Vall]: {
     type: CropType.Vall,
@@ -45,7 +49,8 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     fertilizerCostPerHa: 1200,
     harvestCostPerHa: 500,
     plantQuarter: Quarter.Var,
-    harvestQuarter: Quarter.Sommar, // kan skördas sommar + höst
+    harvestQuarter: Quarter.Sommar,
+    growingSeasons: 1, // Vår→Sommar
   },
   [CropType.Potatis]: {
     type: CropType.Potatis,
@@ -55,6 +60,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 3000,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
+    growingSeasons: 2,
   },
   [CropType.Sockerbeta]: {
     type: CropType.Sockerbeta,
@@ -64,6 +70,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 2500,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
+    growingSeasons: 2,
   },
   [CropType.Trada]: {
     type: CropType.Trada,
@@ -73,6 +80,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 0,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
+    growingSeasons: 0,
   },
   [CropType.Varvete]: {
     type: CropType.Varvete,
@@ -82,6 +90,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 800,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
+    growingSeasons: 2,
   },
   [CropType.Maltkorn]: {
     type: CropType.Maltkorn,
@@ -91,6 +100,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 700,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
+    growingSeasons: 2,
   },
   [CropType.Foderkorn]: {
     type: CropType.Foderkorn,
@@ -100,6 +110,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 700,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
+    growingSeasons: 2,
   },
   [CropType.Grynhavre]: {
     type: CropType.Grynhavre,
@@ -109,6 +120,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 700,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
+    growingSeasons: 2,
   },
   [CropType.Foderhavre]: {
     type: CropType.Foderhavre,
@@ -118,6 +130,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 600,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
+    growingSeasons: 2,
   },
   [CropType.Hostrag]: {
     type: CropType.Hostrag,
@@ -126,7 +139,8 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     fertilizerCostPerHa: 2200,
     harvestCostPerHa: 750,
     plantQuarter: Quarter.Host,
-    harvestQuarter: Quarter.Host, // skördas hösten året efter
+    harvestQuarter: Quarter.Host, // skördas hösten NÄSTA år
+    growingSeasons: 4,
   },
   [CropType.Ragvete]: {
     type: CropType.Ragvete,
@@ -135,7 +149,8 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     fertilizerCostPerHa: 2400,
     harvestCostPerHa: 800,
     plantQuarter: Quarter.Host,
-    harvestQuarter: Quarter.Host, // skördas hösten året efter
+    harvestQuarter: Quarter.Host, // skördas hösten NÄSTA år
+    growingSeasons: 4,
   },
 };
 

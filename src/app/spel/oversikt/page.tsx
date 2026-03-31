@@ -84,6 +84,40 @@ export default function OversiktPage() {
         </Card>
       </div>
 
+      {/* Grain storage */}
+      {(() => {
+        const storage = farm.storage || {};
+        const storedCrops = Object.entries(storage).filter(([, tons]) => tons > 0);
+        const totalStored = Object.values(storage).reduce((a, b) => a + b, 0);
+        const siloCapacity = farm.siloCapacity || 500;
+
+        if (storedCrops.length > 0 || totalStored > 0) {
+          return (
+            <Card title="Spannmålslager">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-stone-500">Silo</span>
+                <span className="font-medium">{totalStored.toFixed(0)} / {siloCapacity} ton</span>
+              </div>
+              <div className="w-full bg-stone-200 rounded-full h-2 mb-3">
+                <div
+                  className={`h-2 rounded-full ${totalStored / siloCapacity > 0.9 ? "bg-red-500" : "bg-amber-500"}`}
+                  style={{ width: `${Math.min(100, (totalStored / siloCapacity) * 100)}%` }}
+                />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {storedCrops.map(([crop, tons]) => (
+                  <div key={crop} className="bg-stone-50 p-2 rounded text-sm">
+                    <div className="font-medium">{crop}</div>
+                    <div className="text-stone-500">{tons.toFixed(1)} ton</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        }
+        return null;
+      })()}
+
       {/* Financial chart */}
       {chartData.length > 0 && (
         <Card title="Ekonomisk utveckling">

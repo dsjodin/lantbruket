@@ -14,6 +14,8 @@ export interface Farm {
   machinery: MachineryLevel;
   buildings: BuildingLevel;
   employees: number;
+  storage: Record<string, number>; // ton lagrad spannmål per CropType
+  siloCapacity: number; // max ton totalt
 }
 
 export interface Field {
@@ -24,6 +26,8 @@ export interface Field {
   soilQuality: number; // 0.8 - 1.2
   fertilizerApplied: boolean;
   status: FieldStatus;
+  plantedYear: number | null;
+  plantedQuarter: Quarter | null;
 }
 
 export interface CropData {
@@ -34,4 +38,5 @@ export interface CropData {
   harvestCostPerHa: number; // kr per hektar
   plantQuarter: Quarter;
   harvestQuarter: Quarter;
+  growingSeasons: number; // min antal kvartal från sådd till skörd
 }

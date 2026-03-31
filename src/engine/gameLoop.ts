@@ -26,7 +26,7 @@ import { MACHINERY_UPGRADES, BUILDING_UPGRADES } from "@/data/machinery";
 import { createRandom } from "@/lib/random";
 import { generateWeather } from "./weather";
 import { generateMarketPrices } from "./market";
-import { calculateYield } from "./crops";
+import { calculateYield, elapsedQuarters } from "./crops";
 import {
   calculateQuarterlyLivestockRevenue,
   applyHealthChange,
@@ -131,6 +131,8 @@ export function createInitialGameState(params: {
         Math.round((0.8 + rng.next() * 0.4) * 100) / 100, // 0.8 - 1.2
       fertilizerApplied: false,
       status: "Oplöjd",
+      plantedYear: null,
+      plantedQuarter: null,
     });
   }
 
@@ -170,6 +172,8 @@ export function createInitialGameState(params: {
       machinery: MachineryLevel.Basic,
       buildings: BuildingLevel.Simple,
       employees: 1,
+      storage: {},
+      siloCapacity: 500,
     },
     finances: {
       cashBalance: startingCapital + loanAmount,
@@ -179,6 +183,7 @@ export function createInitialGameState(params: {
     history: [],
     activeEvents: [],
     seed,
+    currentMarketPrices: generateMarketPrices(seed, 1, Quarter.Var),
   };
 }
 
@@ -232,6 +237,8 @@ export function advanceQuarter(
           field.crop = action.cropType;
           field.status = "Sådd";
           field.fertilizerApplied = false;
+          field.plantedYear = currentYear;
+          field.plantedQuarter = currentQuarter;
         }
         break;
       case "fertilize":
@@ -325,15 +332,26 @@ export function advanceQuarter(
   // ---- Step 6: Generate weather ----
   const weather = generateWeather(currentQuarter, seed, currentYear);
 
-  // ---- Step 7: Calculate crop yields (if harvest quarter) ----
+  // ---- Step 7: Calculate crop yields → harvest to storage ----
+  const storage: Record<string, number> = { ...(farm.storage || {}) };
+  const siloCapacity = farm.siloCapacity || 500;
   const harvestedCrops: Record<string, number> = {};
+
   for (const field of fields) {
     if (!field.crop) continue;
     const cropData = CROPS_DATA[field.crop];
+
+    // Harvest only if enough growing quarters have elapsed
+    const hasPlantingData = field.plantedYear != null && field.plantedQuarter != null;
+    const elapsed = hasPlantingData
+      ? elapsedQuarters(field.plantedYear!, field.plantedQuarter!, currentYear, currentQuarter)
+      : 999; // Legacy fields without planting data: allow harvest
+
     if (
       cropData.harvestQuarter === currentQuarter &&
+      field.status !== "Oplöjd" &&
       field.status !== "Skördad" &&
-      field.status !== "Oplöjd"
+      elapsed >= cropData.growingSeasons
     ) {
       const tons = calculateYield(
         field.crop,
@@ -343,34 +361,41 @@ export function advanceQuarter(
         weather,
         regionData.yieldModifier
       );
-      harvestedCrops[field.crop] =
-        (harvestedCrops[field.crop] ?? 0) + tons;
-      field.status = "Skördeklar";
+
+      const rounded = Math.round(tons * 10) / 10;
+      harvestedCrops[field.crop] = (harvestedCrops[field.crop] ?? 0) + rounded;
+      storage[field.crop] = (storage[field.crop] ?? 0) + rounded;
+
+      field.status = "Skördad";
     }
   }
 
-  // Mark fields explicitly harvested via crop actions
-  for (const action of decisions.cropActions) {
-    if (action.action === "harvest") {
-      const field = fields.find((f) => f.id === action.fieldId);
-      if (field && field.crop) {
-        field.status = "Skördad";
-      }
+  // Clamp total storage to silo capacity
+  const totalStored = Object.values(storage).reduce((a, b) => a + b, 0);
+  if (totalStored > siloCapacity) {
+    // Overflow: oldest (existing) grain is discarded proportionally
+    const scale = siloCapacity / totalStored;
+    for (const key of Object.keys(storage)) {
+      storage[key] = Math.round(storage[key] * scale * 10) / 10;
     }
   }
 
   // ---- Step 8: Generate market prices ----
   const marketPrices = generateMarketPrices(seed, currentYear, currentQuarter);
 
-  // ---- Step 9: Process crop sales ----
+  // ---- Step 9: Process crop sales (from manual sellGrain decisions) ----
   const cropSales = {} as Record<
     CropType,
     { tons: number; pricePerTon: number }
   >;
   for (const cropType of Object.values(CropType)) {
     const tonsToSell = decisions.sellCrops[cropType] ?? 0;
-    const available = harvestedCrops[cropType] ?? 0;
+    // Sell from storage (including newly harvested)
+    const available = storage[cropType] ?? 0;
     const actualSell = Math.min(tonsToSell, available);
+    if (actualSell > 0) {
+      storage[cropType] = Math.round((available - actualSell) * 10) / 10;
+    }
     cropSales[cropType] = {
       tons: actualSell,
       pricePerTon: marketPrices[cropType],
@@ -396,6 +421,8 @@ export function advanceQuarter(
       machinery,
       buildings,
       employees: newEmployees,
+      storage,
+      siloCapacity,
     };
     const newSubsidies = calculateSubsidies(
       updatedFarm,
@@ -430,6 +457,8 @@ export function advanceQuarter(
     machinery,
     buildings,
     employees: newEmployees,
+    storage,
+    siloCapacity,
   };
 
   const costs = calculateQuarterCosts({
@@ -553,6 +582,8 @@ export function advanceQuarter(
         crop: null,
         status: "Oplöjd" as const,
         fertilizerApplied: false,
+        plantedYear: null,
+        plantedQuarter: null,
       };
     return f;
   });
@@ -572,6 +603,8 @@ export function advanceQuarter(
       machinery,
       buildings,
       employees: newEmployees,
+      storage,
+      siloCapacity,
     },
     finances: {
       cashBalance: Math.round(cash),
@@ -581,5 +614,6 @@ export function advanceQuarter(
     history: [...state.history, quarterRecord],
     activeEvents: events,
     seed: state.seed,
+    currentMarketPrices: marketPrices,
   };
 }
