@@ -39,8 +39,8 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     fertilizerCostPerHa: 3000,
     harvestCostPerHa: 900,
     plantQuarter: Quarter.Host,
-    harvestQuarter: Quarter.Sommar, // skördas juli nästa år
-    growingSeasons: 3, // Höst→Vinter→Vår→Sommar
+    harvestQuarter: Quarter.Host, // skördas augusti/september nästa år
+    growingSeasons: 4, // Höst→Vinter→Vår→Sommar→Höst
   },
   [CropType.Vall]: {
     type: CropType.Vall,
@@ -181,7 +181,7 @@ export const HARVEST_QUARTERS: Record<CropType, Quarter[]> = {
   [CropType.Hostvete]: [Quarter.Host],
   [CropType.Varkorn]: [Quarter.Host],
   [CropType.Havre]: [Quarter.Host],
-  [CropType.Hostraps]: [Quarter.Sommar],
+  [CropType.Hostraps]: [Quarter.Host],
   [CropType.Vall]: [Quarter.Sommar, Quarter.Host],
   [CropType.Potatis]: [Quarter.Host],
   [CropType.Sockerbeta]: [Quarter.Host],
