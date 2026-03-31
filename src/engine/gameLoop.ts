@@ -146,14 +146,15 @@ export function createInitialGameState(params: {
     loans.push(createLoan(loanAmount, 10, 0.045, 1));
   }
 
-  // Derive a deterministic seed from the player name
+  // Derive a unique seed: player name + hectares + timestamp for variety
   const seed = Math.floor(
     Math.abs(
       playerName
         .split("")
         .reduce((a, c) => a + c.charCodeAt(0), 0) *
         7919 +
-        totalHectares * 13
+        totalHectares * 13 +
+        (Date.now() % 1000000)
     )
   );
 
