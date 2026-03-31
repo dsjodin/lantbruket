@@ -430,7 +430,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const previousStorage = { ...(state.farm.storage || {}) };
     const previousMarketPrices = { ...(state.currentMarketPrices || {}) };
 
-    const newState = advanceQuarter(state, pendingDecisions);
+    let newState = advanceQuarter(state, pendingDecisions);
 
     // Compute harvested crops (storage diff)
     const newStorage = newState.farm.storage || {};
@@ -472,6 +472,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
       marketPrices: { ...(newState.currentMarketPrices || {}) },
       previousMarketPrices,
     };
+
+    // Patch the latest history record to include manual grain sales
+    if (quarterGrainSalesRevenue > 0 && newState.history.length > 0) {
+      const patchedHistory = [...newState.history];
+      const last = patchedHistory[patchedHistory.length - 1];
+      patchedHistory[patchedHistory.length - 1] = {
+        ...last,
+        financialRecord: {
+          ...last.financialRecord,
+          revenue: {
+            ...last.financialRecord.revenue,
+            cropSales: last.financialRecord.revenue.cropSales + quarterGrainSalesRevenue,
+          },
+          netResult: last.financialRecord.netResult + quarterGrainSalesRevenue,
+          cashBalanceEnd: last.financialRecord.cashBalanceEnd + quarterGrainSalesRevenue,
+        },
+      };
+      newState = { ...newState, history: patchedHistory };
+    }
 
     set({
       state: newState,
