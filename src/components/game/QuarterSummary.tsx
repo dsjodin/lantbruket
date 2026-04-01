@@ -87,6 +87,7 @@ export default function QuarterSummary({ result, onContinue }: QuarterSummaryPro
     { label: "Försäkring", value: result.financialRecord.costs.insurance },
     { label: "Underhåll", value: result.financialRecord.costs.buildingMaintenance },
     { label: "Veterinär", value: result.financialRecord.costs.veterinary },
+    { label: "Lagring", value: result.financialRecord.costs.storageCosts ?? 0 },
   ].filter((c) => c.value > 0);
 
   return (

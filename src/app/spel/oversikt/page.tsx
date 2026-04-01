@@ -3,8 +3,11 @@
 import { useGameStore } from "@/store/gameStore";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { Quarter } from "@/types/enums";
+import { REPAIR_COSTS } from "@/data/machinery";
+import { getMachineConditionModifier } from "@/engine/crops";
 import { calculateScore } from "@/engine/scoring";
 import FarmMap from "@/components/game/FarmMap";
 import {
@@ -306,33 +309,46 @@ export default function OversiktPage() {
       )}
 
       {/* Machinery */}
-      {(farm.machines || []).length > 0 && (
-        <Card title="Maskinpark">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {(farm.machines || []).map((m) => {
-              const condColor = m.condition > 0.7 ? "text-green-600" : m.condition > 0.4 ? "text-amber-600" : "text-red-600";
-              const age = currentYear - m.purchaseYear;
-              return (
-                <div key={m.id} className="bg-stone-50 p-2 rounded text-sm">
-                  <div className="font-medium">{m.name}</div>
-                  <div className="flex justify-between text-xs mt-1">
-                    <span className={condColor}>
-                      {Math.round(m.condition * 100)}% skick
-                    </span>
-                    <span className="text-stone-400">{age > 0 ? `${age} år` : "Ny"}</span>
+      {(farm.machines || []).length > 0 && (() => {
+        const machineMod = getMachineConditionModifier(farm.machines || []);
+        const machinePercent = Math.round((machineMod - 1) * 100);
+        return (
+          <Card title="Maskinpark">
+            {machinePercent < 0 && (
+              <div className="text-xs px-2 py-1.5 mb-2 rounded bg-red-50 text-red-700">
+                Maskinernas skick påverkar skörden med {machinePercent}%. Reparera maskiner via Beslut → Underhåll.
+              </div>
+            )}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {(farm.machines || []).map((m) => {
+                const condColor = m.condition > 0.7 ? "text-green-600" : m.condition > 0.4 ? "text-amber-600" : "text-red-600";
+                const age = currentYear - m.purchaseYear;
+                const repairCost = REPAIR_COSTS[m.type] ?? 15000;
+                return (
+                  <div key={m.id} className="bg-stone-50 p-2 rounded text-sm">
+                    <div className="font-medium">{m.name}</div>
+                    <div className="flex justify-between text-xs mt-1">
+                      <span className={condColor}>
+                        {Math.round(m.condition * 100)}% skick
+                      </span>
+                      <span className="text-stone-400">{age > 0 ? `${age} år` : "Ny"}</span>
+                    </div>
+                    <div className="w-full bg-stone-200 rounded-full h-1.5 mt-1">
+                      <div
+                        className={`h-1.5 rounded-full ${m.condition > 0.7 ? "bg-green-500" : m.condition > 0.4 ? "bg-amber-500" : "bg-red-500"}`}
+                        style={{ width: `${m.condition * 100}%` }}
+                      />
+                    </div>
+                    {m.condition < 0.7 && (
+                      <div className="text-xs text-amber-600 mt-1">Behöver reparation ({(repairCost / 1000)}k kr)</div>
+                    )}
                   </div>
-                  <div className="w-full bg-stone-200 rounded-full h-1.5 mt-1">
-                    <div
-                      className={`h-1.5 rounded-full ${m.condition > 0.7 ? "bg-green-500" : m.condition > 0.4 ? "bg-amber-500" : "bg-red-500"}`}
-                      style={{ width: `${m.condition * 100}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
+                );
+              })}
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* Farm details */}
       <div className="grid md:grid-cols-2 gap-4">

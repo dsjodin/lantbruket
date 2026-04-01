@@ -18,6 +18,7 @@ import {
   MACHINERY_MAINTENANCE,
   BUILDING_MAINTENANCE,
 } from "@/data/machinery";
+import { STORAGE_COST_PER_TON_PER_QUARTER } from "@/data/costs";
 import { calculateQuarterlyLivestockCosts } from "./livestock";
 import { calculateQuarterlyPayment } from "./loans";
 
@@ -56,8 +57,9 @@ export function calculateQuarterCosts(params: {
   livestock: LivestockHerd[];
   loans: Loan[];
   quarter: Quarter;
+  storage?: Record<string, number>;
 }): CostBreakdown {
-  const { farm, fields, livestock, loans, quarter } = params;
+  const { farm, fields, livestock, loans, quarter, storage } = params;
 
   // Seed and fertilizer costs - only charge once, in the planting quarter
   let seeds = 0;
@@ -112,6 +114,12 @@ export function calculateQuarterCosts(params: {
     .filter((f) => f.leased && f.leaseAnnualCost)
     .reduce((sum, f) => sum + (f.leaseAnnualCost! / 4), 0);
 
+  // Storage costs based on total tons stored
+  const totalStored = storage
+    ? Object.values(storage).reduce((sum, tons) => sum + tons, 0)
+    : 0;
+  const storageCosts = totalStored * STORAGE_COST_PER_TON_PER_QUARTER;
+
   return {
     seeds: Math.round(seeds),
     fertilizer: Math.round(fertilizer),
@@ -124,6 +132,7 @@ export function calculateQuarterCosts(params: {
     loanAmortization: Math.round(loanAmortization),
     insurance: Math.round(insurance),
     buildingMaintenance: Math.round(buildingMaintenance),
+    storageCosts: Math.round(storageCosts),
     other: Math.round(leaseCosts),
   };
 }
@@ -152,6 +161,7 @@ export function createFinancialRecord(
     costs.loanAmortization +
     costs.insurance +
     costs.buildingMaintenance +
+    costs.storageCosts +
     costs.other;
 
   const netResult = totalRevenue - totalCosts;

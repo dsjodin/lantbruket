@@ -22,15 +22,16 @@ import {
 import { CROPS_DATA } from "@/data/crops";
 import { LIVESTOCK_DATA } from "@/data/livestock";
 import { REGIONS_DATA } from "@/data/regions";
-import { MACHINERY_UPGRADES, BUILDING_UPGRADES, STARTER_MACHINES } from "@/data/machinery";
+import { MACHINERY_UPGRADES, BUILDING_UPGRADES, STARTER_MACHINES, REPAIR_COSTS, REPAIR_CONDITION_BOOST } from "@/data/machinery";
 
 import { createRandom } from "@/lib/random";
 import { generateWeather } from "./weather";
 import { generateMarketPrices } from "./market";
-import { calculateYield, elapsedQuarters } from "./crops";
+import { calculateYield, elapsedQuarters, updateSoilQuality, getWorkerEfficiencyModifier, getMachineConditionModifier } from "./crops";
 import {
   calculateQuarterlyLivestockRevenue,
   applyHealthChange,
+  getWorkerHealthEffect,
 } from "./livestock";
 import { calculateSubsidies } from "./subsidies";
 import { calculateQuarterlyPayment, processLoanPayment, createLoan } from "./loans";
@@ -134,6 +135,7 @@ export function createInitialGameState(params: {
       status: "Oplöjd",
       plantedYear: null,
       plantedQuarter: null,
+      previousCrops: [],
     });
   }
 
@@ -187,6 +189,7 @@ export function createInitialGameState(params: {
     activeEvents: [],
     seed,
     currentMarketPrices: generateMarketPrices(seed, 1, Quarter.Var),
+    priceHistory: {},
     pendingLandOffers: [],
   };
 }
@@ -310,11 +313,25 @@ export function advanceQuarter(
     cash += decisions.newLoan.amount;
   }
 
-  // ---- Step 5: Machinery/building upgrades ----
+  // ---- Step 5: Machinery/building upgrades & repairs ----
   let machinery = farm.machinery;
   let buildings = farm.buildings;
 
   let machines = (farm.machines || []).map((m) => ({ ...m }));
+
+  // Process machine repairs
+  for (const machineId of (decisions.repairMachines || [])) {
+    const machineIdx = machines.findIndex((m) => m.id === machineId);
+    if (machineIdx !== -1) {
+      const machine = machines[machineIdx];
+      const repairCost = REPAIR_COSTS[machine.type] ?? 15000;
+      cash -= repairCost;
+      machines[machineIdx] = {
+        ...machine,
+        condition: Math.min(1.0, Math.round((machine.condition + REPAIR_CONDITION_BOOST) * 100) / 100),
+      };
+    }
+  }
 
   if (decisions.machineryUpgrade) {
     const upgrade = MACHINERY_UPGRADES.find((u) => u.from === machinery);
@@ -364,19 +381,40 @@ export function advanceQuarter(
         field.soilQuality,
         field.fertilizerApplied,
         weather,
-        regionData.yieldModifier
+        regionData.yieldModifier,
+        field.previousCrops,
+        newEmployees,
+        farm.totalHectares,
+        machines
       );
 
       const rounded = Math.round(tons * 10) / 10;
       harvestedCrops[field.crop] = (harvestedCrops[field.crop] ?? 0) + rounded;
       storage[field.crop] = (storage[field.crop] ?? 0) + rounded;
 
+      // Update soil quality based on harvest
+      field.soilQuality = updateSoilQuality(field.soilQuality, field.crop, true, field.fertilizerApplied);
+
+      // Track crop rotation history
+      field.previousCrops = [field.crop, ...(field.previousCrops || [])].slice(0, 4);
+
       field.status = "Skördad";
     }
   }
 
+  // ---- Step 7b: Apply spoilage to stored crops ----
+  for (const [crop, tons] of Object.entries(storage)) {
+    const cropData = CROPS_DATA[crop as CropType];
+    if (cropData && cropData.spoilageRate > 0 && tons > 0) {
+      const spoiled = Math.round(tons * cropData.spoilageRate * 10) / 10;
+      storage[crop] = Math.round((tons - spoiled) * 10) / 10;
+      if (storage[crop] <= 0) delete storage[crop];
+    }
+  }
+
   // ---- Step 8: Generate market prices ----
-  const marketPrices = generateMarketPrices(seed, currentYear, currentQuarter);
+  const previousPrices = state.currentMarketPrices as Record<CropType, number>;
+  const marketPrices = generateMarketPrices(seed, currentYear, currentQuarter, previousPrices);
 
   // Sell overflow that doesn't fit in silo at current market price
   let overflowRevenue = 0;
@@ -489,6 +527,7 @@ export function advanceQuarter(
     livestock,
     loans,
     quarter: currentQuarter,
+    storage,
   });
 
   // ---- Step 13: Process loan payments ----
@@ -519,6 +558,13 @@ export function advanceQuarter(
   // Apply event health effects to livestock
   if (eventState.healthDelta !== 0) {
     livestock = applyHealthChange(livestock, eventState.healthDelta);
+  }
+
+  // Apply worker staffing effect on animal health
+  const totalAnimals = livestock.reduce((sum, h) => sum + h.count, 0);
+  const workerHealthDelta = getWorkerHealthEffect(newEmployees, totalAnimals);
+  if (workerHealthDelta !== 0) {
+    livestock = applyHealthChange(livestock, workerHealthDelta);
   }
   // Track event income/costs for the financial record (flows through revenue/costs, not direct cash)
   const eventIncome = Math.max(0, eventState.directCashChange);
@@ -572,6 +618,7 @@ export function advanceQuarter(
     adjustedCosts.loanAmortization +
     adjustedCosts.insurance +
     adjustedCosts.buildingMaintenance +
+    adjustedCosts.storageCosts +
     adjustedCosts.other;
 
   cash += totalRevenue - totalCosts;
@@ -602,20 +649,27 @@ export function advanceQuarter(
 
   // Advance field growth statuses between quarters
   const advancedFields = fields.map((f) => {
+    // Update soil quality for fallow/grass fields each quarter
+    let soilQuality = f.soilQuality;
+    if (f.crop === CropType.Trada || f.crop === CropType.Vall) {
+      soilQuality = updateSoilQuality(soilQuality, f.crop, false, false);
+    }
+
     if (f.status === "Sådd")
-      return { ...f, status: "Växande" as const };
+      return { ...f, soilQuality, status: "Växande" as const };
     if (f.status === "Växande")
-      return { ...f, status: "Skördeklar" as const };
+      return { ...f, soilQuality, status: "Skördeklar" as const };
     if (f.status === "Skördad")
       return {
         ...f,
+        soilQuality,
         crop: null,
         status: "Oplöjd" as const,
         fertilizerApplied: false,
         plantedYear: null,
         plantedQuarter: null,
       };
-    return f;
+    return { ...f, soilQuality };
   });
 
   // Pre-harvest: harvest any crops that are ready in the upcoming quarter
@@ -633,10 +687,15 @@ export function advanceQuarter(
     // Harvest this field now
     const tons = calculateYield(
       f.crop, f.hectares, f.soilQuality, f.fertilizerApplied,
-      nextWeather, regionData.yieldModifier
+      nextWeather, regionData.yieldModifier,
+      f.previousCrops, newEmployees, farm.totalHectares, machines
     );
     const rounded = Math.round(tons * 10) / 10;
     storage[f.crop] = (storage[f.crop] ?? 0) + rounded;
+
+    // Update soil quality and rotation history for pre-harvested fields
+    const updatedSoilQuality = updateSoilQuality(f.soilQuality, f.crop, true, f.fertilizerApplied);
+    const updatedPreviousCrops = [f.crop, ...(f.previousCrops || [])].slice(0, 4);
 
     return {
       ...f,
@@ -645,11 +704,13 @@ export function advanceQuarter(
       fertilizerApplied: false,
       plantedYear: null,
       plantedQuarter: null,
+      soilQuality: updatedSoilQuality,
+      previousCrops: updatedPreviousCrops,
     };
   });
 
   // Sell overflow from pre-harvest at next quarter's market prices
-  const nextMarketPrices = generateMarketPrices(seed, nextYear, nextQuarter);
+  const nextMarketPrices = generateMarketPrices(seed, nextYear, nextQuarter, marketPrices);
   const totalStoredFinal = Object.values(storage).reduce((a, b) => a + b, 0);
   if (totalStoredFinal > siloCapacity) {
     const overflow = totalStoredFinal - siloCapacity;
@@ -746,6 +807,22 @@ export function advanceQuarter(
     activeEvents: events,
     seed: state.seed,
     currentMarketPrices: marketPrices,
+    priceHistory: updatePriceHistory(state.priceHistory || {}, marketPrices),
     pendingLandOffers: landOffers,
   };
+}
+
+/**
+ * Append current prices to price history, keeping last 8 quarters per crop.
+ */
+function updatePriceHistory(
+  history: Record<string, number[]>,
+  currentPrices: Record<CropType, number>
+): Record<string, number[]> {
+  const updated: Record<string, number[]> = {};
+  for (const [crop, price] of Object.entries(currentPrices)) {
+    const prev = history[crop] || [];
+    updated[crop] = [...prev, price].slice(-8);
+  }
+  return updated;
 }

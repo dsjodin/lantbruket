@@ -57,3 +57,16 @@ export function applyHealthChange(
     };
   });
 }
+
+/**
+ * Calculate worker effect on animal health based on staffing level.
+ * Good staffing slowly improves health; understaffing degrades it.
+ */
+export function getWorkerHealthEffect(employees: number, totalAnimals: number): number {
+  if (totalAnimals === 0) return 0;
+  const animalsPerWorker = totalAnimals / Math.max(1, employees);
+  if (animalsPerWorker <= 30) return 0.01;    // Bra: +1% hälsa/kvartal
+  if (animalsPerWorker <= 60) return 0;        // Normalt
+  if (animalsPerWorker <= 100) return -0.01;   // Underbemannat: -1%
+  return -0.02;                                 // Allvarligt underbemannat: -2%
+}

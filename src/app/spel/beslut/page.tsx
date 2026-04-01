@@ -6,9 +6,11 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { Quarter, CropType, AnimalType, SubsidyType } from "@/types/enums";
-import { CROPS_DATA, PLANTING_QUARTERS } from "@/data/crops";
+import { CROPS_DATA, PLANTING_QUARTERS, ROTATION_EFFECTS } from "@/data/crops";
 import { LIVESTOCK_DATA } from "@/data/livestock";
 import { REGIONS_DATA } from "@/data/regions";
+import { REPAIR_COSTS } from "@/data/machinery";
+import { getRotationModifier, getWorkerEfficiencyModifier } from "@/engine/crops";
 
 function MessageBar() {
   const messages = useGameStore((s) => s.messages);
@@ -357,48 +359,7 @@ function WinterDecisions() {
       </Card>
 
       <Card title="Underhåll & investeringar" accent="amber">
-        <div className="space-y-3">
-          <div className="text-sm">
-            <span className="text-stone-500">Maskinpark:</span>{" "}
-            <span className="font-medium">{state.farm.machinery}</span>
-          </div>
-          {(state.farm.machines || []).length > 0 && (
-            <div className="space-y-1.5">
-              {(state.farm.machines || []).map((m) => {
-                const condColor = m.condition > 0.7 ? "text-green-600" : m.condition > 0.4 ? "text-amber-600" : "text-red-600";
-                return (
-                  <div key={m.id} className="flex justify-between items-center text-sm py-1 border-b border-stone-100">
-                    <span>{m.name}</span>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs ${condColor}`}>{Math.round(m.condition * 100)}%</span>
-                      <span className="text-xs text-stone-400">{m.maintenanceCostPerQuarter.toLocaleString("sv-SE")} kr/kv</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <div className="text-sm mt-2">
-            <span className="text-stone-500">Byggnader:</span>{" "}
-            <span className="font-medium">{state.farm.buildings}</span>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => updateDecisions({ machineryUpgrade: true })}
-            >
-              Uppgradera maskiner
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => updateDecisions({ buildingUpgrade: true })}
-            >
-              Uppgradera byggnader
-            </Button>
-          </div>
-        </div>
+        <MachineRepairSection />
       </Card>
 
       <GrainSalesCard />
@@ -472,6 +433,9 @@ function PlantingCard({ crops, quarter }: { crops: CropType[]; quarter: Quarter 
             {emptyFields.map((f) => {
               const cost = CROPS_DATA[selectedCrop].seedCostPerHa * f.hectares;
               const canAfford = availableCash >= cost;
+              const rotMod = getRotationModifier(f.previousCrops || [], selectedCrop);
+              const rotPercent = Math.round((rotMod - 1) * 100);
+              const lastCrop = f.previousCrops?.[0];
               return (
                 <div key={f.id} className="flex justify-between items-center p-2 bg-stone-50 rounded-lg">
                   <div>
@@ -479,6 +443,16 @@ function PlantingCard({ crops, quarter }: { crops: CropType[]; quarter: Quarter 
                     <span className="text-xs text-stone-400">
                       ({f.hectares} ha, jord {Math.round(f.soilQuality * 100)}%)
                     </span>
+                    {lastCrop && (
+                      <span className="text-xs text-stone-400 ml-1">
+                        [föreg: {lastCrop}]
+                      </span>
+                    )}
+                    {rotPercent !== 0 && (
+                      <span className={`text-xs ml-1 font-semibold ${rotPercent > 0 ? "text-green-600" : "text-red-500"}`}>
+                        {rotPercent > 0 ? "+" : ""}{rotPercent}% växtföljd
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-stone-500">{cost.toLocaleString("sv-SE")} kr</span>
@@ -649,14 +623,27 @@ function PersonnelControls() {
   const hireWorker = useGameStore((s) => s.hireWorker);
   const fireWorker = useGameStore((s) => s.fireWorker);
 
+  const workerMod = getWorkerEfficiencyModifier(state.farm.employees, state.farm.totalHectares);
+  const workerPercent = Math.round((workerMod - 1) * 100);
+  const haPerWorker = Math.round(state.farm.totalHectares / Math.max(1, state.farm.employees));
+
+  let staffLabel = "Normalt";
+  let staffColor = "text-stone-600";
+  if (workerPercent > 0) { staffLabel = "Väl bemannat"; staffColor = "text-green-600"; }
+  else if (workerPercent < -10) { staffLabel = "Allvarligt underbemannat"; staffColor = "text-red-600"; }
+  else if (workerPercent < 0) { staffLabel = "Underbemannat"; staffColor = "text-amber-600"; }
+
   return (
     <div className="space-y-2">
       <div className="text-sm">
         Nuvarande: <strong>{state.farm.employees}</strong> anställda
+        <span className="text-xs text-stone-400 ml-2">({haPerWorker} ha/anställd)</span>
+      </div>
+      <div className={`text-xs font-medium ${staffColor}`}>
+        {staffLabel} ({workerPercent >= 0 ? "+" : ""}{workerPercent}% skördeeffektivitet)
       </div>
       <div className="text-sm text-stone-500">
         Lönekostnad: {(state.farm.employees * 100000).toLocaleString("sv-SE")} kr/kvartal
-        ({(state.farm.employees * 100000 * 4).toLocaleString("sv-SE")} kr/år)
       </div>
       <div className="flex gap-2">
         <Button size="sm" variant="secondary" onClick={hireWorker}>
@@ -669,6 +656,80 @@ function PersonnelControls() {
           disabled={state.farm.employees === 0}
         >
           -1 anställd
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function MachineRepairSection() {
+  const state = useGameStore((s) => s.state)!;
+  const repairMachine = useGameStore((s) => s.repairMachine);
+  const updateDecisions = useGameStore((s) => s.updateDecisions);
+
+  const machines = state.farm.machines || [];
+  const avgCondition = machines.length > 0
+    ? machines.reduce((sum, m) => sum + m.condition, 0) / machines.length
+    : 1;
+  const condPercent = Math.round(avgCondition * 100);
+
+  return (
+    <div className="space-y-3">
+      <div className="text-sm">
+        <span className="text-stone-500">Maskinpark:</span>{" "}
+        <span className="font-medium">{state.farm.machinery}</span>
+        {condPercent < 70 && (
+          <span className={`text-xs ml-2 font-semibold ${condPercent < 50 ? "text-red-600" : "text-amber-600"}`}>
+            (snittskick {condPercent}% — påverkar skörd {condPercent < 50 ? "-12%" : condPercent < 70 ? "-5%" : ""})
+          </span>
+        )}
+      </div>
+      {machines.length > 0 && (
+        <div className="space-y-1.5">
+          {machines.map((m) => {
+            const condColor = m.condition > 0.7 ? "text-green-600" : m.condition > 0.4 ? "text-amber-600" : "text-red-600";
+            const repairCost = REPAIR_COSTS[m.type] ?? 15000;
+            const canRepair = m.condition < 0.85 && state.finances.cashBalance >= repairCost;
+            const needsRepair = m.condition < 0.7;
+            return (
+              <div key={m.id} className="flex justify-between items-center text-sm py-1 border-b border-stone-100">
+                <span>{m.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs ${condColor}`}>{Math.round(m.condition * 100)}%</span>
+                  {needsRepair && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => repairMachine(m.id)}
+                      disabled={!canRepair}
+                    >
+                      Reparera ({(repairCost / 1000)}k)
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="text-sm mt-2">
+        <span className="text-stone-500">Byggnader:</span>{" "}
+        <span className="font-medium">{state.farm.buildings}</span>
+      </div>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => updateDecisions({ machineryUpgrade: true })}
+        >
+          Uppgradera maskiner
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => updateDecisions({ buildingUpgrade: true })}
+        >
+          Uppgradera byggnader
         </Button>
       </div>
     </div>
@@ -710,6 +771,16 @@ function GrainSalesCard() {
           />
         </div>
       </div>
+
+      {/* Spoilage warning for perishable crops */}
+      {storedCrops.some(([crop]) => {
+        const cd = CROPS_DATA[crop as CropType];
+        return cd && cd.spoilageRate >= 0.03;
+      }) && (
+        <div className="text-xs px-2 py-1.5 mb-2 rounded bg-amber-50 text-amber-700">
+          Färskvaror (potatis, sockerbetor) tappar {">"}3% per kvartal i lager. Sälj snart!
+        </div>
+      )}
 
       {storedCrops.length === 0 ? (
         <p className="text-sm text-stone-400">

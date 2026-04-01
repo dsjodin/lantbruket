@@ -84,6 +84,19 @@ export const STARTER_MACHINES: Record<MachineryLevel, Machine[]> = {
   ],
 };
 
+/** Reparationskostnad per maskintyp (kr) */
+export const REPAIR_COSTS: Record<string, number> = {
+  traktor: 25000,
+  plog: 8000,
+  harv: 10000,
+  saamaskin: 12000,
+  troska: 35000,
+  spruta: 15000,
+};
+
+/** Skickförbättring per reparation */
+export const REPAIR_CONDITION_BOOST = 0.25;
+
 export const MACHINE_TYPE_LABELS: Record<string, string> = {
   traktor: "Traktor",
   plog: "Plog",

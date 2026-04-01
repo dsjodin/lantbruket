@@ -51,5 +51,6 @@ export interface CostBreakdown {
   loanAmortization: number;
   insurance: number;
   buildingMaintenance: number;
+  storageCosts: number;
   other: number;
 }

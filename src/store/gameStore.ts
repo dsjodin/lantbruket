@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { GameState, QuarterDecisions, CropType, AnimalType, SubsidyType } from "@/types";
+import { GameState, QuarterDecisions, CropType, AnimalType, SubsidyType, type Field } from "@/types";
 import { Region } from "@/types/enums";
 import { CROPS_DATA } from "@/data/crops";
 import { LIVESTOCK_DATA } from "@/data/livestock";
@@ -9,7 +9,7 @@ import {
   createInitialGameState,
   advanceQuarter,
 } from "@/engine/gameLoop";
-import { STARTER_MACHINES } from "@/data/machinery";
+import { STARTER_MACHINES, REPAIR_COSTS, REPAIR_CONDITION_BOOST } from "@/data/machinery";
 
 const SAVE_KEY = "lantbruket-save";
 
@@ -24,7 +24,7 @@ export interface QuarterResult {
   harvestedCrops: Record<string, number>; // crop → tons added to storage
   financialRecord: {
     revenue: { cropSales: number; livestockIncome: number; subsidies: number; other: number };
-    costs: { seeds: number; fertilizer: number; fuel: number; machinery: number; feed: number; veterinary: number; salaries: number; loanInterest: number; loanAmortization: number; insurance: number; buildingMaintenance: number; other: number };
+    costs: { seeds: number; fertilizer: number; fuel: number; machinery: number; feed: number; veterinary: number; salaries: number; loanInterest: number; loanAmortization: number; insurance: number; buildingMaintenance: number; storageCosts: number; other: number };
     netResult: number;
   };
   marketPrices: Record<string, number>;
@@ -40,6 +40,7 @@ const emptyDecisions: QuarterDecisions = {
   machineryUpgrade: false,
   buildingUpgrade: false,
   sellCrops: {} as Record<CropType, number>,
+  repairMachines: [],
 };
 
 interface GameStore {
@@ -72,6 +73,7 @@ interface GameStore {
   fireWorker: () => void;
   applyForSubsidies: (types: SubsidyType[]) => void;
   takeLoan: (amount: number, termYears: number, interestRate: number) => void;
+  repairMachine: (machineId: string) => void;
   acceptLandOffer: (offerId: string) => void;
   declineLandOffer: (offerId: string) => void;
 
@@ -345,6 +347,40 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
+  repairMachine: (machineId) => {
+    const { state } = get();
+    if (!state) return;
+
+    const machine = state.farm.machines.find((m) => m.id === machineId);
+    if (!machine) return;
+
+    const repairCost = REPAIR_COSTS[machine.type] ?? 15000;
+    if (state.finances.cashBalance < repairCost) {
+      set({ messages: [{ text: `Inte tillräckligt med pengar! Reparation kostar ${repairCost.toLocaleString("sv-SE")} kr.`, type: "error" }] });
+      return;
+    }
+
+    const newMachines = state.farm.machines.map((m) =>
+      m.id === machineId
+        ? { ...m, condition: Math.min(1.0, Math.round((m.condition + REPAIR_CONDITION_BOOST) * 100) / 100) }
+        : m
+    );
+
+    const pd = get().pendingDecisions;
+    set({
+      state: {
+        ...state,
+        farm: { ...state.farm, machines: newMachines },
+        finances: { ...state.finances, cashBalance: state.finances.cashBalance - repairCost },
+      },
+      pendingDecisions: {
+        ...pd,
+        repairMachines: [...pd.repairMachines, machineId],
+      },
+      messages: [{ text: `${machine.name} reparerad! Skick +${Math.round(REPAIR_CONDITION_BOOST * 100)}% (-${repairCost.toLocaleString("sv-SE")} kr)`, type: "success" }],
+    });
+  },
+
   acceptLandOffer: (offerId) => {
     const { state } = get();
     if (!state) return;
@@ -361,7 +397,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const isLease = offer.type === "lease";
 
     // Create new fields from the offer
-    const newFields: { id: string; name: string; hectares: number; crop: null; soilQuality: number; fertilizerApplied: boolean; status: "Oplöjd"; plantedYear: null; plantedQuarter: null; leased?: boolean; leaseAnnualCost?: number }[] = [];
+    const newFields: Field[] = [];
     const fieldCount = offer.hectares > 15 ? 2 : 1;
     for (let i = 0; i < fieldCount; i++) {
       const ha = i === fieldCount - 1
@@ -377,6 +413,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         status: "Oplöjd" as const,
         plantedYear: null,
         plantedQuarter: null,
+        previousCrops: [],
         ...(isLease ? { leased: true, leaseAnnualCost: Math.round(offer.totalPrice * (ha / offer.hectares)) } : {}),
       });
     }
@@ -471,7 +508,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         netResult: latestRecord.financialRecord.netResult + quarterGrainSalesRevenue,
       } : {
         revenue: { cropSales: 0, livestockIncome: 0, subsidies: 0, other: 0 },
-        costs: { seeds: 0, fertilizer: 0, fuel: 0, machinery: 0, feed: 0, veterinary: 0, salaries: 0, loanInterest: 0, loanAmortization: 0, insurance: 0, buildingMaintenance: 0, other: 0 },
+        costs: { seeds: 0, fertilizer: 0, fuel: 0, machinery: 0, feed: 0, veterinary: 0, salaries: 0, loanInterest: 0, loanAmortization: 0, insurance: 0, buildingMaintenance: 0, storageCosts: 0, other: 0 },
         netResult: 0,
       },
       marketPrices: { ...(newState.currentMarketPrices || {}) },
