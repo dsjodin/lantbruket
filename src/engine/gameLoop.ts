@@ -735,6 +735,9 @@ export function advanceQuarter(
     const rounded = Math.round(tons * 10) / 10;
     storage[f.crop] = (storage[f.crop] ?? 0) + rounded;
 
+    // Track pre-harvested crops so they show in the quarter summary
+    harvestedCrops[f.crop] = (harvestedCrops[f.crop] ?? 0) + rounded;
+
     // Update soil quality and rotation history for pre-harvested fields
     const updatedSoilQuality = updateSoilQuality(f.soilQuality, f.crop, true, f.fertilizerApplied);
     const updatedPreviousCrops = [f.crop, ...(f.previousCrops || [])].slice(0, 4);
