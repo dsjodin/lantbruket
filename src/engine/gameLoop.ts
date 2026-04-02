@@ -754,8 +754,10 @@ export function advanceQuarter(
     };
   });
 
-  // Sell overflow from pre-harvest at next quarter's market prices
-  const nextMarketPrices = generateMarketPrices(seed, nextYear, nextQuarter, marketPrices);
+  // Sell overflow from pre-harvest at current market prices
+  // This revenue must be added to cash and financial record since they were
+  // already computed before the pre-harvest ran.
+  let preHarvestOverflowRevenue = 0;
   const totalStoredFinal = Object.values(storage).reduce((a, b) => a + b, 0);
   if (totalStoredFinal > siloCapacity) {
     const overflow = totalStoredFinal - siloCapacity;
@@ -769,12 +771,23 @@ export function advanceQuarter(
         remaining
       );
       if (sellTons > 0) {
-        overflowRevenue += sellTons * (nextMarketPrices[crop as CropType] ?? 0);
+        preHarvestOverflowRevenue += sellTons * (marketPrices[crop as CropType] ?? 0);
         storage[crop] = Math.round((stored - sellTons) * 10) / 10;
         if (storage[crop] <= 0) delete storage[crop];
         remaining -= sellTons;
       }
     }
+  }
+
+  // Add pre-harvest overflow revenue to cash and financial record
+  // (revenue object is shared with financialRecord.revenue, so updating it
+  //  also updates the record's revenue breakdown)
+  if (preHarvestOverflowRevenue > 0) {
+    const rounded = Math.round(preHarvestOverflowRevenue);
+    cash += rounded;
+    revenue.cropSales += rounded;
+    financialRecord.netResult += rounded;
+    financialRecord.cashBalanceEnd += rounded;
   }
 
   const gameEnded =
