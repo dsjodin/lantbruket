@@ -235,7 +235,7 @@ export default function OversiktPage() {
         const storage = farm.storage || {};
         const storedCrops = Object.entries(storage).filter(([, tons]) => tons > 0);
         const totalStored = Object.values(storage).reduce((a, b) => a + b, 0);
-        const siloCapacity = farm.siloCapacity || 500;
+        const siloCapacity = farm.siloCapacity || 50;
 
         if (storedCrops.length > 0 || totalStored > 0) {
           // Estimate storage value from current market prices
@@ -261,6 +261,11 @@ export default function OversiktPage() {
                   style={{ width: `${Math.min(100, (totalStored / siloCapacity) * 100)}%` }}
                 />
               </div>
+              {siloCapacity <= 50 && (
+                <div className="text-xs text-amber-600 mt-1 mb-2">
+                  Du har bara en enkel lada. Bygg en silo via Beslut → Underhåll & investeringar för att lagra mer.
+                </div>
+              )}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {storedCrops.map(([crop, tons]) => {
                   const price = state.currentMarketPrices?.[crop] ?? 0;

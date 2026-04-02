@@ -768,25 +768,36 @@ function MachineRepairSection() {
           <span className="font-medium">{state.farm.buildings}</span>
         </div>
         <div className="text-xs text-stone-500 mt-1">
-          {state.farm.buildings === BuildingLevel.Simple && "Enkel lada och foderlager. Begränsad kapacitet."}
-          {state.farm.buildings === BuildingLevel.Standard && "Standardbyggnader med bra lagerkapacitet och djurutrymmen."}
-          {state.farm.buildings === BuildingLevel.Expanded && "Moderna, utbyggda lokaler med maximal kapacitet."}
+          {state.farm.buildings === BuildingLevel.Simple && "Du har en enkel lada. Liten lagringskapacitet (50 ton) och inga specialutrymmen."}
+          {state.farm.buildings === BuildingLevel.Standard && "Silo och maskinhall. Bra lagerkapacitet (400 ton) och djurutrymmen."}
+          {state.farm.buildings === BuildingLevel.Expanded && "Stor siloanläggning, modern maskinhall och fullständiga djurstallar (1 000 ton lagring)."}
         </div>
 
         {buildUpgrade ? (
           <div className="mt-3 p-3 bg-blue-50 rounded-lg">
             <div className="text-sm font-medium text-blue-800">
-              Uppgradera till {buildUpgrade.to}
+              {buildUpgrade.from === BuildingLevel.Simple ? "Bygg silo och maskinhall" : "Bygg ut till stor anläggning"}
             </div>
             <div className="text-xs text-blue-600 mt-1 space-y-0.5">
               <div>Kostnad: <strong>{buildUpgrade.cost.toLocaleString("sv-SE")} kr</strong></div>
-              <div>Silokapacitet: +50% (mer lagringsutrymme)</div>
-              <div>Djurhälsa: +2% per kvartal (bättre stallmiljö)</div>
+              {buildUpgrade.from === BuildingLevel.Simple ? (
+                <>
+                  <div>Silokapacitet: 50 → 400 ton</div>
+                  <div>Maskinhall skyddar maskiner</div>
+                  <div>Bättre djurhälsa: +1%/kvartal</div>
+                </>
+              ) : (
+                <>
+                  <div>Silokapacitet: 400 → 1 000 ton</div>
+                  <div>Modern maskinverkstad</div>
+                  <div>Djurhälsa: +2%/kvartal</div>
+                </>
+              )}
               <div>Underhåll: {buildUpgrade.maintenanceCostPerQuarter.toLocaleString("sv-SE")} kr/kvartal</div>
             </div>
             {buildUpgradeQueued ? (
               <div className="mt-2 text-xs font-semibold text-green-700">
-                Uppgradering beställd — genomförs vid kvartalsskifte
+                Bygge beställt — genomförs vid kvartalsskifte
               </div>
             ) : (
               <Button
@@ -795,7 +806,9 @@ function MachineRepairSection() {
                 onClick={() => updateDecisions({ buildingUpgrade: true })}
                 disabled={!canAffordBuildUpgrade}
               >
-                Uppgradera ({(buildUpgrade.cost / 1000).toLocaleString("sv-SE")}k kr)
+                {buildUpgrade.from === BuildingLevel.Simple
+                  ? `Bygg (${buildUpgrade.cost.toLocaleString("sv-SE")} kr)`
+                  : `Bygg ut (${buildUpgrade.cost.toLocaleString("sv-SE")} kr)`}
                 {!canAffordBuildUpgrade && " — ej råd"}
               </Button>
             )}

@@ -1,6 +1,8 @@
 "use client";
 
 import { type QuarterResult } from "@/store/gameStore";
+import Tooltip from "@/components/ui/Tooltip";
+import { GLOSSARY } from "@/data/glossary";
 
 interface QuarterSummaryProps {
   result: QuarterResult;
@@ -37,6 +39,16 @@ function fmt(n: number): string {
 function fmtChange(n: number): string {
   const prefix = n >= 0 ? "+" : "";
   return prefix + fmt(n);
+}
+
+function Term({ term, children }: { term: string; children: React.ReactNode }) {
+  const explanation = GLOSSARY[term];
+  if (!explanation) return <>{children}</>;
+  return (
+    <Tooltip text={explanation}>
+      <span className="underline decoration-dotted decoration-stone-400 cursor-help">{children}</span>
+    </Tooltip>
+  );
 }
 
 export default function QuarterSummary({ result, onContinue }: QuarterSummaryProps) {
@@ -184,7 +196,7 @@ export default function QuarterSummary({ result, onContinue }: QuarterSummaryPro
           {/* Financial Summary */}
           <div className="bg-white/80 border border-stone-200 rounded-lg p-4">
             <h3 className="text-sm font-bold text-stone-700 uppercase tracking-wide mb-3">
-              Resultaträkning
+              <Term term="Resultaträkning">Resultaträkning</Term>
             </h3>
 
             <div className="grid grid-cols-2 gap-4">
@@ -241,6 +253,24 @@ export default function QuarterSummary({ result, onContinue }: QuarterSummaryPro
             </div>
             <div className={`text-lg font-bold ${result.cashChange >= 0 ? "text-green-700" : "text-red-600"}`}>
               {fmtChange(result.cashChange)}
+            </div>
+          </div>
+
+          {/* Pedagogical insight */}
+          <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-3">
+            <div className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">Vad betyder detta?</div>
+            <div className="text-sm text-blue-800">
+              {netResult >= 0
+                ? `Gården gick med ${fmt(netResult)} i vinst detta kvartal. ${
+                    totalRevenue > 0 && revenueItems[0]?.value > totalRevenue * 0.5
+                      ? `Största inkomstkällan var ${revenueItems[0].label.toLowerCase()} (${Math.round((revenueItems[0].value / totalRevenue) * 100)}% av intäkterna).`
+                      : "Intäkterna var spridda över flera källor — bra diversifiering!"
+                  }`
+                : `Gården gick med ${fmt(Math.abs(netResult))} i förlust. ${
+                    costItems[0]?.value > totalCosts * 0.3
+                      ? `Den största kostnaden var ${costItems[0].label.toLowerCase()} — undersök om den kan minskas.`
+                      : "Kostnaderna var höga överlag. Se över både rörliga och fasta kostnader."
+                  }`}
             </div>
           </div>
 
