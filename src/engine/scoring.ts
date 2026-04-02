@@ -35,18 +35,15 @@ export function calculateScore(
   const cash = state.finances.cashBalance;
   // Estimate asset value: land value + machinery + buildings + livestock
   const landValue = state.farm.totalHectares * 50000; // rough per-ha value
-  const machineryValue =
-    state.farm.machinery === "Avancerad"
-      ? 1500000
-      : state.farm.machinery === "Modern"
-        ? 600000
-        : 100000;
-  const buildingValue =
-    state.farm.buildings === "Utbyggd"
-      ? 1000000
-      : state.farm.buildings === "Standard"
-        ? 400000
-        : 100000;
+  // Machine value: sum based on condition and type (rough estimate)
+  const machineryValue = (state.farm.machines || []).reduce((sum, m) => {
+    const baseValue = m.maintenanceCostPerQuarter * 20; // rough heuristic
+    return sum + Math.round(baseValue * m.condition);
+  }, 0);
+  // Building value: sum of construction costs (estimated from maintenance)
+  const buildingValue = (state.farm.buildings || []).reduce((sum, b) => {
+    return sum + b.maintenanceCostPerQuarter * 25; // rough heuristic
+  }, 0);
 
   const netWorth = cash + landValue + machineryValue + buildingValue - totalLoans;
   // Scale: 0 at negative, 100 at 10M+ for a ~100ha farm

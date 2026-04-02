@@ -206,6 +206,19 @@ export default function QuarterSummary({ result, onContinue }: QuarterSummaryPro
                 <span>Totalt skördat</span>
                 <span>{totalHarvestedTons.toFixed(1)} ton</span>
               </div>
+              {totalHarvestedTons > 0 && result.siloCapacity > 0 && (
+                <div className="mt-2 text-xs text-amber-700">
+                  <div className="flex justify-between">
+                    <span>Silokapacitet</span>
+                    <span>{result.totalStoredAfter.toFixed(1)} / {result.siloCapacity} ton</span>
+                  </div>
+                  {result.totalStoredAfter >= result.siloCapacity && (
+                    <p className="mt-1 text-amber-600 italic">
+                      ⚠ Silon är full — överskottet såldes direkt till marknadspris. Bygg mer lagerkapacitet för att kunna spara och sälja till bättre pris.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

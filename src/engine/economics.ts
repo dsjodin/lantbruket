@@ -14,10 +14,7 @@ import {
 } from "@/types";
 import type { LivestockHerd } from "@/types";
 import { CROPS_DATA } from "@/data/crops";
-import {
-  MACHINERY_MAINTENANCE,
-  BUILDING_MAINTENANCE,
-} from "@/data/machinery";
+// Machine and building maintenance is now calculated from individual items on farm
 import { STORAGE_COST_PER_TON_PER_QUARTER } from "@/data/costs";
 import { calculateQuarterlyLivestockCosts } from "./livestock";
 import { calculateQuarterlyPayment } from "./loans";
@@ -84,8 +81,10 @@ export function calculateQuarterCosts(params: {
   const usedHectares = fields.reduce((sum, f) => sum + f.hectares, 0);
   const fuel = (usedHectares * FUEL_COST_PER_HA_PER_YEAR) / 4;
 
-  // Machinery depreciation/maintenance (quarterly)
-  const machinery = MACHINERY_MAINTENANCE[farm.machinery] ?? 8000;
+  // Machinery maintenance (quarterly, sum of all machines)
+  const machinery = (farm.machines || []).reduce(
+    (sum, m) => sum + m.maintenanceCostPerQuarter, 0
+  );
 
   // Livestock costs
   const livestockCosts = calculateQuarterlyLivestockCosts(livestock);
@@ -106,8 +105,10 @@ export function calculateQuarterCosts(params: {
   // Insurance (quarterly)
   const insurance = (farm.totalHectares * INSURANCE_COST_PER_HA_PER_YEAR) / 4;
 
-  // Building maintenance (quarterly)
-  const buildingMaintenance = BUILDING_MAINTENANCE[farm.buildings] ?? 5000;
+  // Building maintenance (quarterly, sum of all buildings)
+  const buildingMaintenance = (farm.buildings || []).reduce(
+    (sum, b) => sum + b.maintenanceCostPerQuarter, 0
+  );
 
   // Lease costs (quarterly = annual / 4)
   const leaseCosts = fields

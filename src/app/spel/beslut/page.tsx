@@ -9,9 +9,9 @@ import { Quarter, CropType, AnimalType, SubsidyType } from "@/types/enums";
 import { CROPS_DATA, PLANTING_QUARTERS, ROTATION_EFFECTS } from "@/data/crops";
 import { LIVESTOCK_DATA } from "@/data/livestock";
 import { REGIONS_DATA } from "@/data/regions";
-import { REPAIR_COSTS, MACHINERY_UPGRADES, BUILDING_UPGRADES } from "@/data/machinery";
+import { REPAIR_COSTS } from "@/data/machinery";
+import { BUILDING_CATALOG, MACHINE_SHOP, MACHINE_TYPE_LABELS } from "@/data/buildings";
 import { getRotationModifier, getWorkerEfficiencyModifier } from "@/engine/crops";
-import { MachineryLevel, BuildingLevel } from "@/types/enums";
 
 function MessageBar() {
   const messages = useGameStore((s) => s.messages);
@@ -156,6 +156,10 @@ function SpringDecisions() {
       <Card title="Personal">
         <PersonnelControls />
       </Card>
+
+      <Card title="Investeringar" accent="amber">
+        <InvestmentSection />
+      </Card>
     </div>
   );
 }
@@ -206,6 +210,10 @@ function SummerDecisions() {
           )}
         </div>
       </Card>
+
+      <Card title="Investeringar" accent="amber">
+        <InvestmentSection />
+      </Card>
     </div>
   );
 }
@@ -255,6 +263,10 @@ function AutumnDecisions() {
 
       <Card title="Sälj djur">
         <LivestockSeller />
+      </Card>
+
+      <Card title="Investeringar" accent="amber">
+        <InvestmentSection />
       </Card>
     </div>
   );
@@ -359,8 +371,8 @@ function WinterDecisions() {
         })()}
       </Card>
 
-      <Card title="Underhåll & investeringar" accent="amber">
-        <MachineRepairSection />
+      <Card title="Investeringar" accent="amber">
+        <InvestmentSection />
       </Card>
 
       <GrainSalesCard />
@@ -663,53 +675,80 @@ function PersonnelControls() {
   );
 }
 
-function MachineRepairSection() {
+function InvestmentSection() {
   const state = useGameStore((s) => s.state)!;
   const repairMachine = useGameStore((s) => s.repairMachine);
-  const updateDecisions = useGameStore((s) => s.updateDecisions);
-  const pendingDecisions = useGameStore((s) => s.pendingDecisions);
+  const buyMachine = useGameStore((s) => s.buyMachine);
+  const constructBuilding = useGameStore((s) => s.constructBuilding);
+  const [tab, setTab] = useState<"machines" | "buildings">("machines");
 
   const machines = state.farm.machines || [];
-  const avgCondition = machines.length > 0
-    ? machines.reduce((sum, m) => sum + m.condition, 0) / machines.length
-    : 1;
-  const condPercent = Math.round(avgCondition * 100);
+  const farmBuildings = state.farm.buildings || [];
+  const cash = state.finances.cashBalance;
 
-  // Machinery upgrade info
-  const machUpgrade = MACHINERY_UPGRADES.find((u) => u.from === state.farm.machinery);
-  const canAffordMachUpgrade = machUpgrade ? state.finances.cashBalance >= machUpgrade.cost : false;
-  const machUpgradeQueued = pendingDecisions.machineryUpgrade;
+  // Workshop discount for repairs
+  const workshop = farmBuildings.find((b) => b.type === "verkstad");
+  const repairDiscount = workshop?.effects.repairDiscount ?? 0;
 
-  // Building upgrade info
-  const buildUpgrade = BUILDING_UPGRADES.find((u) => u.from === state.farm.buildings);
-  const canAffordBuildUpgrade = buildUpgrade ? state.finances.cashBalance >= buildUpgrade.cost : false;
-  const buildUpgradeQueued = pendingDecisions.buildingUpgrade;
+  // Available buildings (not yet built, prerequisites met)
+  const existingBuildingTypes = farmBuildings.map((b) => b.type);
+  const existingBuildingIds = farmBuildings.map((b) => b.id);
+  const availableBuildings = BUILDING_CATALOG.filter((def) => {
+    if (existingBuildingIds.includes(def.id)) return false; // Already built
+    if (def.requires) {
+      return def.requires.every((req) => existingBuildingTypes.includes(req as typeof existingBuildingTypes[number]));
+    }
+    return true;
+  });
+
+  // Silo capacity summary
+  const siloFromBuildings = farmBuildings.reduce((sum, b) => sum + (b.effects.siloCapacity ?? 0), 0);
+  const totalSilo = 50 + siloFromBuildings;
 
   return (
-    <div className="space-y-4">
-      {/* Machinery section */}
-      <div>
-        <div className="text-sm">
-          <span className="text-stone-500">Maskinpark:</span>{" "}
-          <span className="font-medium">{state.farm.machinery}</span>
-          {condPercent < 70 && (
-            <span className={`text-xs ml-2 font-semibold ${condPercent < 50 ? "text-red-600" : "text-amber-600"}`}>
-              (snittskick {condPercent}% — påverkar skörd {condPercent < 50 ? "-12%" : condPercent < 70 ? "-5%" : ""})
-            </span>
-          )}
-        </div>
-        {machines.length > 0 && (
-          <div className="space-y-1.5 mt-2">
-            {machines.map((m) => {
-              const condColor = m.condition > 0.7 ? "text-green-600" : m.condition > 0.4 ? "text-amber-600" : "text-red-600";
-              const repairCost = REPAIR_COSTS[m.type] ?? 15000;
-              const canRepair = m.condition < 0.85 && state.finances.cashBalance >= repairCost;
-              const needsRepair = m.condition < 0.7;
-              return (
-                <div key={m.id} className="flex justify-between items-center text-sm py-1 border-b border-stone-100">
-                  <span>{m.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs ${condColor}`}>{Math.round(m.condition * 100)}%</span>
+    <div className="space-y-3">
+      {/* Tab toggle */}
+      <div className="flex gap-1">
+        <button
+          onClick={() => setTab("machines")}
+          className={`px-3 py-1.5 rounded text-xs font-medium ${tab === "machines" ? "bg-amber-600 text-white" : "bg-stone-100 text-stone-600"}`}
+        >
+          Maskiner ({machines.length})
+        </button>
+        <button
+          onClick={() => setTab("buildings")}
+          className={`px-3 py-1.5 rounded text-xs font-medium ${tab === "buildings" ? "bg-amber-600 text-white" : "bg-stone-100 text-stone-600"}`}
+        >
+          Byggnader ({farmBuildings.length})
+        </button>
+      </div>
+
+      {tab === "machines" && (
+        <div className="space-y-3">
+          {/* Current machines with repair */}
+          <div>
+            <div className="text-xs font-medium text-stone-500 mb-1">Dina maskiner</div>
+            <div className="space-y-1">
+              {machines.map((m) => {
+                const condColor = m.condition > 0.7 ? "text-green-600" : m.condition > 0.4 ? "text-amber-600" : "text-red-600";
+                const baseCost = REPAIR_COSTS[m.type] ?? 15000;
+                const repairCost = Math.round(baseCost * (1 - repairDiscount));
+                const canRepair = m.condition < 0.85 && cash >= repairCost;
+                const needsRepair = m.condition < 0.7;
+                return (
+                  <div key={m.id} className="flex justify-between items-center text-sm py-1 border-b border-stone-100">
+                    <div>
+                      <span className="font-medium">{m.name}</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <div className="w-16 bg-stone-200 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full ${m.condition > 0.7 ? "bg-green-500" : m.condition > 0.4 ? "bg-amber-500" : "bg-red-500"}`}
+                            style={{ width: `${m.condition * 100}%` }}
+                          />
+                        </div>
+                        <span className={`text-xs ${condColor}`}>{Math.round(m.condition * 100)}%</span>
+                      </div>
+                    </div>
                     {needsRepair && (
                       <Button
                         size="sm"
@@ -717,108 +756,115 @@ function MachineRepairSection() {
                         onClick={() => repairMachine(m.id)}
                         disabled={!canRepair}
                       >
-                        Reparera ({(repairCost / 1000)}k)
+                        Reparera ({(repairCost / 1000).toFixed(0)}k)
                       </Button>
                     )}
                   </div>
+                );
+              })}
+            </div>
+            {repairDiscount > 0 && (
+              <div className="text-xs text-green-600 mt-1">Verkstadsrabatt: -{Math.round(repairDiscount * 100)}% på reparationer</div>
+            )}
+          </div>
+
+          {/* Buy machines */}
+          <div>
+            <div className="text-xs font-medium text-stone-500 mb-1">Köp maskin</div>
+            <div className="space-y-2">
+              {MACHINE_SHOP.map((def) => (
+                <div key={def.id} className="p-2 bg-stone-50 rounded-lg">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="text-sm font-medium">{def.name}</div>
+                      <div className="text-xs text-stone-500">{def.description}</div>
+                      <div className="flex gap-3 mt-1 text-xs text-stone-400">
+                        <span>Skick: {Math.round(def.condition * 100)}%</span>
+                        <span>Underhåll: {def.maintenanceCostPerQuarter.toLocaleString("sv-SE")} kr/kv</span>
+                        {def.efficiencyBonus && <span className="text-green-600">+{Math.round(def.efficiencyBonus * 100)}% effektivitet</span>}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => buyMachine(def.id)}
+                      disabled={cash < def.cost}
+                    >
+                      {(def.cost / 1000).toFixed(0)}k kr
+                    </Button>
+                  </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Machinery upgrade */}
-        {machUpgrade ? (
-          <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-            <div className="text-sm font-medium text-blue-800">
-              Uppgradera till {machUpgrade.to}
+      {tab === "buildings" && (
+        <div className="space-y-3">
+          {/* Current buildings */}
+          <div>
+            <div className="text-xs font-medium text-stone-500 mb-1">
+              Dina byggnader
+              <span className="text-stone-400 ml-1">(Lagringskapacitet: {totalSilo} ton)</span>
             </div>
-            <div className="text-xs text-blue-600 mt-1 space-y-0.5">
-              <div>Kostnad: <strong>{machUpgrade.cost.toLocaleString("sv-SE")} kr</strong></div>
-              <div>Nya maskiner i toppskick (alla byts ut)</div>
-              <div>Underhåll: {machUpgrade.maintenanceCostPerQuarter.toLocaleString("sv-SE")} kr/kvartal</div>
-            </div>
-            {machUpgradeQueued ? (
-              <div className="mt-2 text-xs font-semibold text-green-700">
-                Uppgradering beställd — genomförs vid kvartalsskifte
+            {farmBuildings.length === 0 ? (
+              <div className="text-xs text-stone-400 italic p-2 bg-stone-50 rounded">
+                Enkel lada (50 ton lagring). Bygg silo och andra byggnader nedan.
               </div>
             ) : (
-              <Button
-                size="sm"
-                className="mt-2"
-                onClick={() => updateDecisions({ machineryUpgrade: true })}
-                disabled={!canAffordMachUpgrade}
-              >
-                Uppgradera ({(machUpgrade.cost / 1000).toLocaleString("sv-SE")}k kr)
-                {!canAffordMachUpgrade && " — ej råd"}
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="mt-2 text-xs text-green-600 font-medium">
-            Maskinparken är redan på högsta nivå (Avancerad).
-          </div>
-        )}
-      </div>
-
-      {/* Building section */}
-      <div className="pt-3 border-t border-stone-200">
-        <div className="text-sm">
-          <span className="text-stone-500">Byggnader:</span>{" "}
-          <span className="font-medium">{state.farm.buildings}</span>
-        </div>
-        <div className="text-xs text-stone-500 mt-1">
-          {state.farm.buildings === BuildingLevel.Simple && "Du har en enkel lada. Liten lagringskapacitet (50 ton) och inga specialutrymmen."}
-          {state.farm.buildings === BuildingLevel.Standard && "Silo och maskinhall. Bra lagerkapacitet (400 ton) och djurutrymmen."}
-          {state.farm.buildings === BuildingLevel.Expanded && "Stor siloanläggning, modern maskinhall och fullständiga djurstallar (1 000 ton lagring)."}
-        </div>
-
-        {buildUpgrade ? (
-          <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-            <div className="text-sm font-medium text-blue-800">
-              {buildUpgrade.from === BuildingLevel.Simple ? "Bygg silo och maskinhall" : "Bygg ut till stor anläggning"}
-            </div>
-            <div className="text-xs text-blue-600 mt-1 space-y-0.5">
-              <div>Kostnad: <strong>{buildUpgrade.cost.toLocaleString("sv-SE")} kr</strong></div>
-              {buildUpgrade.from === BuildingLevel.Simple ? (
-                <>
-                  <div>Silokapacitet: 50 → 400 ton</div>
-                  <div>Maskinhall skyddar maskiner</div>
-                  <div>Bättre djurhälsa: +1%/kvartal</div>
-                </>
-              ) : (
-                <>
-                  <div>Silokapacitet: 400 → 1 000 ton</div>
-                  <div>Modern maskinverkstad</div>
-                  <div>Djurhälsa: +2%/kvartal</div>
-                </>
-              )}
-              <div>Underhåll: {buildUpgrade.maintenanceCostPerQuarter.toLocaleString("sv-SE")} kr/kvartal</div>
-            </div>
-            {buildUpgradeQueued ? (
-              <div className="mt-2 text-xs font-semibold text-green-700">
-                Bygge beställt — genomförs vid kvartalsskifte
+              <div className="space-y-1">
+                {farmBuildings.map((b) => (
+                  <div key={b.id} className="flex justify-between text-sm py-1 border-b border-stone-100">
+                    <div>
+                      <span className="font-medium">{b.name}</span>
+                      <div className="text-xs text-stone-400">
+                        {b.effects.siloCapacity && `+${b.effects.siloCapacity} ton lagring`}
+                        {b.effects.machineProtection && "Skyddar maskiner"}
+                        {b.effects.animalHealthBonus && `Djurhälsa +${Math.round(b.effects.animalHealthBonus * 100)}%/kv`}
+                        {b.effects.repairDiscount && `Reparationsrabatt ${Math.round(b.effects.repairDiscount * 100)}%`}
+                        {b.effects.animalCapacity && ` | Plats: ${b.effects.animalCapacity} djur`}
+                      </div>
+                    </div>
+                    <span className="text-xs text-stone-400">{b.maintenanceCostPerQuarter.toLocaleString("sv-SE")} kr/kv</span>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <Button
-                size="sm"
-                className="mt-2"
-                onClick={() => updateDecisions({ buildingUpgrade: true })}
-                disabled={!canAffordBuildUpgrade}
-              >
-                {buildUpgrade.from === BuildingLevel.Simple
-                  ? `Bygg (${buildUpgrade.cost.toLocaleString("sv-SE")} kr)`
-                  : `Bygg ut (${buildUpgrade.cost.toLocaleString("sv-SE")} kr)`}
-                {!canAffordBuildUpgrade && " — ej råd"}
-              </Button>
             )}
           </div>
-        ) : (
-          <div className="mt-2 text-xs text-green-600 font-medium">
-            Byggnaderna är redan på högsta nivå (Utbyggd).
-          </div>
-        )}
-      </div>
+
+          {/* Available to build */}
+          {availableBuildings.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-stone-500 mb-1">Bygg nytt</div>
+              <div className="space-y-2">
+                {availableBuildings.map((def) => (
+                  <div key={def.id} className="p-2 bg-blue-50 rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="text-sm font-medium text-blue-800">{def.name}</div>
+                        <div className="text-xs text-blue-600">{def.description}</div>
+                        <div className="text-xs text-blue-500 mt-1">
+                          Underhåll: {def.maintenanceCostPerQuarter.toLocaleString("sv-SE")} kr/kvartal
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => constructBuilding(def.id)}
+                        disabled={cash < def.cost}
+                      >
+                        {(def.cost / 1000).toFixed(0)}k kr
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {availableBuildings.length === 0 && farmBuildings.length > 0 && (
+            <div className="text-xs text-green-600 font-medium">Alla tillgängliga byggnader är uppförda!</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

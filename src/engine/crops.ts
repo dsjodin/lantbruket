@@ -6,6 +6,7 @@ import { type CropType, type Quarter, type WeatherCondition, type Field, CropTyp
 import type { Machine } from "@/types/farm";
 import { CROPS_DATA, ROTATION_EFFECTS } from "@/data/crops";
 import { getYieldModifier } from "./weather";
+import { createRandom } from "@/lib/random";
 
 /**
  * Map quarters to sequential index for elapsed-time calculations.
@@ -124,7 +125,8 @@ export function calculateYield(
   employees?: number,
   totalHectares?: number,
   machines?: Machine[],
-  machineryEfficiency?: number
+  machineryEfficiency?: number,
+  fieldSeed?: number
 ): number {
   const cropData = CROPS_DATA[crop];
   const baseYield = cropData.baseYieldPerHa;
@@ -139,8 +141,18 @@ export function calculateYield(
   const machineMod = machines ? getMachineConditionModifier(machines) : 1.0;
   const efficiencyMod = machineryEfficiency ?? 1.0;
 
+  // Natural yield variation: ±12% random scatter per field per season
+  // Represents biological variation, micro-climate, pest pressure, timing, etc.
+  let naturalVariation = 1.0;
+  if (fieldSeed != null) {
+    const rng = createRandom(fieldSeed);
+    naturalVariation = rng.nextGaussian(1.0, 0.08); // std dev 8% → ~95% within ±16%
+    naturalVariation = Math.max(0.75, Math.min(1.25, naturalVariation)); // clamp
+  }
+
   return baseYield * hectares * soilQuality * weatherMod * regionModifier
-    * fertilizerMod * rotationMod * workerMod * machineMod * efficiencyMod;
+    * fertilizerMod * rotationMod * workerMod * machineMod * efficiencyMod
+    * naturalVariation;
 }
 
 /**
