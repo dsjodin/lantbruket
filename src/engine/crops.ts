@@ -123,7 +123,8 @@ export function calculateYield(
   previousCrops?: CropType[],
   employees?: number,
   totalHectares?: number,
-  machines?: Machine[]
+  machines?: Machine[],
+  machineryEfficiency?: number
 ): number {
   const cropData = CROPS_DATA[crop];
   const baseYield = cropData.baseYieldPerHa;
@@ -136,9 +137,10 @@ export function calculateYield(
   const workerMod = (employees != null && totalHectares != null)
     ? getWorkerEfficiencyModifier(employees, totalHectares) : 1.0;
   const machineMod = machines ? getMachineConditionModifier(machines) : 1.0;
+  const efficiencyMod = machineryEfficiency ?? 1.0;
 
   return baseYield * hectares * soilQuality * weatherMod * regionModifier
-    * fertilizerMod * rotationMod * workerMod * machineMod;
+    * fertilizerMod * rotationMod * workerMod * machineMod * efficiencyMod;
 }
 
 /**

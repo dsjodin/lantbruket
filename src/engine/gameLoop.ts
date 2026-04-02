@@ -343,6 +343,9 @@ export function advanceQuarter(
     }
   }
 
+  // Determine machinery efficiency modifier based on current level
+  const machineryEfficiency = MACHINERY_UPGRADES.find((u) => u.to === machinery)?.efficiencyModifier ?? 1.0;
+
   if (decisions.buildingUpgrade) {
     const upgrade = BUILDING_UPGRADES.find((u) => u.from === buildings);
     if (upgrade) {
@@ -351,12 +354,20 @@ export function advanceQuarter(
     }
   }
 
+  // Apply building upgrade effects: increased silo capacity
+  let siloCapacity = farm.siloCapacity || Math.round(farm.totalHectares * 5);
+  const baseSiloCapacity = Math.round(farm.totalHectares * 5);
+  if (buildings === BuildingLevel.Standard) {
+    siloCapacity = Math.round(baseSiloCapacity * 1.5); // +50% kapacitet
+  } else if (buildings === BuildingLevel.Expanded) {
+    siloCapacity = Math.round(baseSiloCapacity * 2.0); // +100% kapacitet
+  }
+
   // ---- Step 6: Generate weather ----
   const weather = generateWeather(currentQuarter, seed, currentYear);
 
   // ---- Step 7: Calculate crop yields → harvest to storage ----
   const storage: Record<string, number> = { ...(farm.storage || {}) };
-  const siloCapacity = farm.siloCapacity || 500;
   const harvestedCrops: Record<string, number> = {};
 
   for (const field of fields) {
@@ -385,7 +396,8 @@ export function advanceQuarter(
         field.previousCrops,
         newEmployees,
         farm.totalHectares,
-        machines
+        machines,
+        machineryEfficiency
       );
 
       const rounded = Math.round(tons * 10) / 10;
@@ -566,6 +578,17 @@ export function advanceQuarter(
   if (workerHealthDelta !== 0) {
     livestock = applyHealthChange(livestock, workerHealthDelta);
   }
+
+  // Apply building-level health bonus for livestock (better housing)
+  if (totalAnimals > 0) {
+    const buildingHealthBonus =
+      buildings === BuildingLevel.Expanded ? 0.02 :
+      buildings === BuildingLevel.Standard ? 0.01 :
+      0;
+    if (buildingHealthBonus > 0) {
+      livestock = applyHealthChange(livestock, buildingHealthBonus);
+    }
+  }
   // Track event income/costs for the financial record (flows through revenue/costs, not direct cash)
   const eventIncome = Math.max(0, eventState.directCashChange);
   const eventCost = Math.max(0, -eventState.directCashChange);
@@ -688,7 +711,8 @@ export function advanceQuarter(
     const tons = calculateYield(
       f.crop, f.hectares, f.soilQuality, f.fertilizerApplied,
       nextWeather, regionData.yieldModifier,
-      f.previousCrops, newEmployees, farm.totalHectares, machines
+      f.previousCrops, newEmployees, farm.totalHectares, machines,
+      machineryEfficiency
     );
     const rounded = Math.round(tons * 10) / 10;
     storage[f.crop] = (storage[f.crop] ?? 0) + rounded;
