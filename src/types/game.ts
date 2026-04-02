@@ -35,7 +35,9 @@ export interface GameState {
   activeEvents: GameEvent[];
   seed: number; // För slumpmässig men reproducerbar händelsegenerering
   currentMarketPrices: Record<string, number>; // Aktuella marknadspriser per CropType
+  priceHistory: Record<string, number[]>; // Senaste 8 kvartalens priser per gröda
   pendingLandOffers: LandOffer[];
+  lastHarvestedCrops?: Record<string, number>; // Faktisk skörd (oberoende av silokapacitet)
 }
 
 export interface QuarterDecisions {
@@ -44,9 +46,10 @@ export interface QuarterDecisions {
   hireWorkers: number;
   newLoan: { amount: number; termYears: number; interestRate: number } | null;
   subsidyApplications: SubsidyType[];
-  machineryUpgrade: boolean;
-  buildingUpgrade: boolean;
+  buyMachines: string[];      // Machine shop IDs att köpa
+  constructBuildings: string[]; // Building catalog IDs att bygga
   sellCrops: Record<CropType, number>; // ton att sälja per gröda
+  repairMachines: string[]; // machine IDs att reparera
 }
 
 export interface CropAction {

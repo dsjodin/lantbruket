@@ -48,6 +48,7 @@ export enum EventCategory {
   Machinery = "Maskineri",
 }
 
+// Legacy enums kept for migration compatibility
 export enum MachineryLevel {
   Basic = "Grundläggande",
   Modern = "Modern",

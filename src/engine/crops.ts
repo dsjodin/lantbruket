@@ -3,8 +3,10 @@
  */
 
 import { type CropType, type Quarter, type WeatherCondition, type Field, CropType as CT, Quarter as Q } from "@/types";
-import { CROPS_DATA } from "@/data/crops";
+import type { Machine } from "@/types/farm";
+import { CROPS_DATA, ROTATION_EFFECTS } from "@/data/crops";
 import { getYieldModifier } from "./weather";
+import { createRandom } from "@/lib/random";
 
 /**
  * Map quarters to sequential index for elapsed-time calculations.
@@ -32,8 +34,85 @@ export function elapsedQuarters(
 }
 
 /**
+ * Calculate rotation modifier based on field's crop history.
+ * Monoculture penalty: -8% per consecutive same crop (max -24%).
+ * Good predecessor bonus: +8%. Bad predecessor penalty: -5%.
+ */
+export function getRotationModifier(previousCrops: CropType[], currentCrop: CropType): number {
+  if (!previousCrops || previousCrops.length === 0 || currentCrop === CT.Trada) return 1.0;
+
+  const lastCrop = previousCrops[0];
+  let modifier = 1.0;
+
+  // Monokulturstraff: samma gröda i rad
+  const consecutiveSame = previousCrops.findIndex(c => c !== currentCrop);
+  const sameCount = consecutiveSame === -1 ? previousCrops.length : consecutiveSame;
+  if (sameCount >= 1) modifier -= 0.08 * Math.min(sameCount, 3); // -8%, -16%, -24%
+
+  // Växtföljdsbonus/straff baserat på förgröda
+  const rotation = ROTATION_EFFECTS[currentCrop];
+  if (rotation) {
+    if (rotation.goodPredecessors.includes(lastCrop)) modifier += 0.08;
+    if (rotation.badPredecessors.includes(lastCrop)) modifier -= 0.05;
+  }
+
+  return Math.max(0.7, Math.min(1.15, modifier));
+}
+
+/**
+ * Update soil quality based on farming activity.
+ * Fallow and grass restore soil; intensive crops drain it.
+ */
+export function updateSoilQuality(
+  currentQuality: number,
+  crop: CropType | null,
+  harvested: boolean,
+  hasFertilizer: boolean
+): number {
+  let sq = currentQuality;
+
+  if (crop === CT.Trada) {
+    sq += 0.03; // Träda restaurerar
+  } else if (crop === CT.Vall) {
+    sq += 0.02; // Vall förbättrar
+  } else if (harvested && crop) {
+    // Intensiva grödor dränerar mer
+    const isIntensive = crop === CT.Potatis || crop === CT.Sockerbeta;
+    const drain = isIntensive ? 0.03 : 0.015;
+    sq -= hasFertilizer ? drain * 0.3 : drain; // Gödsel bromsar degradering
+  }
+
+  return Math.round(Math.max(0.6, Math.min(1.3, sq)) * 100) / 100;
+}
+
+/**
+ * Worker efficiency modifier based on hectares per employee.
+ */
+export function getWorkerEfficiencyModifier(employees: number, totalHectares: number): number {
+  const haPerWorker = totalHectares / Math.max(1, employees);
+  if (haPerWorker <= 50) return 1.05;   // Väl bemannat
+  if (haPerWorker <= 100) return 1.0;   // Normalt
+  if (haPerWorker <= 150) return 0.93;  // Underbemannat
+  return 0.85;                           // Allvarligt underbemannat
+}
+
+/**
+ * Machine condition modifier on yield.
+ * Poor machine condition reduces harvest efficiency.
+ */
+export function getMachineConditionModifier(machines: Machine[]): number {
+  if (!machines || machines.length === 0) return 1.0;
+  const avgCondition = machines.reduce((sum, m) => sum + m.condition, 0) / machines.length;
+  if (avgCondition >= 0.7) return 1.0;    // Bra skick
+  if (avgCondition >= 0.5) return 0.95;   // Slitet: -5%
+  if (avgCondition >= 0.3) return 0.88;   // Dåligt: -12%
+  return 0.80;                             // Kritiskt: -20%
+}
+
+/**
  * Calculate crop yield in tons.
  * Formula: baseYield * hectares * soilQuality * weatherMod * regionMod * fertilizerMod
+ *          * rotationMod * workerMod * machineMod
  */
 export function calculateYield(
   crop: CropType,
@@ -41,7 +120,13 @@ export function calculateYield(
   soilQuality: number,
   fertilizerApplied: boolean,
   weather: WeatherCondition,
-  regionModifier: number
+  regionModifier: number,
+  previousCrops?: CropType[],
+  employees?: number,
+  totalHectares?: number,
+  machines?: Machine[],
+  machineryEfficiency?: number,
+  fieldSeed?: number
 ): number {
   const cropData = CROPS_DATA[crop];
   const baseYield = cropData.baseYieldPerHa;
@@ -50,8 +135,24 @@ export function calculateYield(
 
   const weatherMod = getYieldModifier(weather);
   const fertilizerMod = fertilizerApplied ? 1.15 : 0.85;
+  const rotationMod = previousCrops ? getRotationModifier(previousCrops, crop) : 1.0;
+  const workerMod = (employees != null && totalHectares != null)
+    ? getWorkerEfficiencyModifier(employees, totalHectares) : 1.0;
+  const machineMod = machines ? getMachineConditionModifier(machines) : 1.0;
+  const efficiencyMod = machineryEfficiency ?? 1.0;
 
-  return baseYield * hectares * soilQuality * weatherMod * regionModifier * fertilizerMod;
+  // Natural yield variation: ±12% random scatter per field per season
+  // Represents biological variation, micro-climate, pest pressure, timing, etc.
+  let naturalVariation = 1.0;
+  if (fieldSeed != null) {
+    const rng = createRandom(fieldSeed);
+    naturalVariation = rng.nextGaussian(1.0, 0.08); // std dev 8% → ~95% within ±16%
+    naturalVariation = Math.max(0.75, Math.min(1.25, naturalVariation)); // clamp
+  }
+
+  return baseYield * hectares * soilQuality * weatherMod * regionModifier
+    * fertilizerMod * rotationMod * workerMod * machineMod * efficiencyMod
+    * naturalVariation;
 }
 
 /**

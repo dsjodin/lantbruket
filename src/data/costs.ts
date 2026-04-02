@@ -28,6 +28,9 @@ export const MACHINERY_UPGRADE_COST = {
   toAdvanced: 1200000,
 };
 
+/** Lagringskostnad per ton och kvartal (kr) */
+export const STORAGE_COST_PER_TON_PER_QUARTER = 15;
+
 /** Kostnad för att uppgradera byggnader (kr) */
 export const BUILDING_UPGRADE_COST = {
   toStandard: 300000,

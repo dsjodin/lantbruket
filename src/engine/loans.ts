@@ -3,7 +3,6 @@
  */
 
 import type { Loan, GameState } from "@/types";
-import { MachineryLevel, BuildingLevel } from "@/types/enums";
 
 export interface CreditAssessment {
   approved: boolean;
@@ -16,16 +15,6 @@ export interface CreditAssessment {
 }
 
 const LAND_VALUE_PER_HA = 50000;
-const MACHINERY_VALUES: Record<MachineryLevel, number> = {
-  [MachineryLevel.Basic]: 200000,
-  [MachineryLevel.Modern]: 700000,
-  [MachineryLevel.Advanced]: 1900000,
-};
-const BUILDING_VALUES: Record<BuildingLevel, number> = {
-  [BuildingLevel.Simple]: 150000,
-  [BuildingLevel.Standard]: 450000,
-  [BuildingLevel.Expanded]: 1250000,
-};
 
 /**
  * Assess a farm's creditworthiness based on assets, debt, and cash flow.
@@ -34,8 +23,14 @@ export function assessCreditworthiness(state: GameState): CreditAssessment {
   const { farm, finances, history } = state;
 
   const landValue = farm.totalHectares * LAND_VALUE_PER_HA;
-  const machineryValue = MACHINERY_VALUES[farm.machinery] ?? 200000;
-  const buildingValue = BUILDING_VALUES[farm.buildings] ?? 150000;
+  // Machine value based on maintenance cost × condition (proxy for purchase price)
+  const machineryValue = (farm.machines || []).reduce(
+    (sum, m) => sum + Math.round(m.maintenanceCostPerQuarter * 20 * m.condition), 0
+  );
+  // Building value based on maintenance cost (proxy for construction price)
+  const buildingValue = (farm.buildings || []).reduce(
+    (sum, b) => sum + b.maintenanceCostPerQuarter * 25, 0
+  );
   const storageValue = Object.entries(farm.storage || {}).reduce((sum, [crop, tons]) => {
     const price = state.currentMarketPrices?.[crop] ?? 0;
     return sum + tons * price;

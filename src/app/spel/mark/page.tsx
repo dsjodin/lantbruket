@@ -4,6 +4,7 @@ import { useGameStore } from "@/store/gameStore";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import FarmMap from "@/components/game/FarmMap";
+import { CropType } from "@/types/enums";
 
 const statusColors: Record<string, "green" | "amber" | "blue" | "stone" | "red"> = {
   "Oplöjd": "stone",
@@ -106,8 +107,18 @@ export default function MarkPage() {
                 </div>
                 <div className="text-xs text-stone-500">
                   Jordkvalitet: {Math.round(field.soilQuality * 100)}%
+                  {field.soilQuality >= 1.1 && <span className="text-green-600 ml-1">Utmärkt</span>}
+                  {field.soilQuality <= 0.7 && <span className="text-red-500 ml-1">Utarmad</span>}
+                  {field.crop === CropType.Vall || field.crop === CropType.Trada ? (
+                    <span className="text-green-600 ml-1">(jord förbättras)</span>
+                  ) : field.crop ? (
+                    <span className="text-amber-600 ml-1">(jord utarmas)</span>
+                  ) : null}
                   {field.fertilizerApplied && " | Gödslad"}
                   {field.leased && ` | Arrende ${((field.leaseAnnualCost ?? 0) / 1000).toFixed(0)}k kr/år`}
+                  {(field.previousCrops?.length ?? 0) > 0 && (
+                    <span className="ml-1">| Växtföljd: {(field.previousCrops ?? []).slice(0, 3).join(" → ")}</span>
+                  )}
                 </div>
               </div>
               <Badge color={statusColors[field.status] || "stone"}>

@@ -9,8 +9,9 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     fertilizerCostPerHa: 2500,
     harvestCostPerHa: 800,
     plantQuarter: Quarter.Host,
-    harvestQuarter: Quarter.Host, // skördas hösten NÄSTA år
-    growingSeasons: 4, // Höst→Vinter→Vår→Sommar→Höst
+    harvestQuarter: Quarter.Host,
+    growingSeasons: 4,
+    spoilageRate: 0.01,
   },
   [CropType.Varkorn]: {
     type: CropType.Varkorn,
@@ -20,7 +21,8 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 700,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
-    growingSeasons: 2, // Vår→Sommar→Höst
+    growingSeasons: 2,
+    spoilageRate: 0.01,
   },
   [CropType.Havre]: {
     type: CropType.Havre,
@@ -31,6 +33,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
     growingSeasons: 2,
+    spoilageRate: 0.01,
   },
   [CropType.Hostraps]: {
     type: CropType.Hostraps,
@@ -39,8 +42,9 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     fertilizerCostPerHa: 3000,
     harvestCostPerHa: 900,
     plantQuarter: Quarter.Host,
-    harvestQuarter: Quarter.Host, // skördas augusti/september nästa år
-    growingSeasons: 4, // Höst→Vinter→Vår→Sommar→Höst
+    harvestQuarter: Quarter.Host,
+    growingSeasons: 4,
+    spoilageRate: 0.02,
   },
   [CropType.Vall]: {
     type: CropType.Vall,
@@ -50,7 +54,8 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     harvestCostPerHa: 500,
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Sommar,
-    growingSeasons: 1, // Vår→Sommar
+    growingSeasons: 1,
+    spoilageRate: 0.02,
   },
   [CropType.Potatis]: {
     type: CropType.Potatis,
@@ -61,6 +66,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
     growingSeasons: 2,
+    spoilageRate: 0.05,
   },
   [CropType.Sockerbeta]: {
     type: CropType.Sockerbeta,
@@ -71,6 +77,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
     growingSeasons: 2,
+    spoilageRate: 0.07,
   },
   [CropType.Trada]: {
     type: CropType.Trada,
@@ -81,6 +88,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
     growingSeasons: 0,
+    spoilageRate: 0,
   },
   [CropType.Varvete]: {
     type: CropType.Varvete,
@@ -91,6 +99,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
     growingSeasons: 2,
+    spoilageRate: 0.01,
   },
   [CropType.Maltkorn]: {
     type: CropType.Maltkorn,
@@ -101,6 +110,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
     growingSeasons: 2,
+    spoilageRate: 0.01,
   },
   [CropType.Foderkorn]: {
     type: CropType.Foderkorn,
@@ -111,6 +121,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
     growingSeasons: 2,
+    spoilageRate: 0.01,
   },
   [CropType.Grynhavre]: {
     type: CropType.Grynhavre,
@@ -121,6 +132,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
     growingSeasons: 2,
+    spoilageRate: 0.01,
   },
   [CropType.Foderhavre]: {
     type: CropType.Foderhavre,
@@ -131,6 +143,7 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     plantQuarter: Quarter.Var,
     harvestQuarter: Quarter.Host,
     growingSeasons: 2,
+    spoilageRate: 0.01,
   },
   [CropType.Hostrag]: {
     type: CropType.Hostrag,
@@ -139,8 +152,9 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     fertilizerCostPerHa: 2200,
     harvestCostPerHa: 750,
     plantQuarter: Quarter.Host,
-    harvestQuarter: Quarter.Host, // skördas hösten NÄSTA år
+    harvestQuarter: Quarter.Host,
     growingSeasons: 4,
+    spoilageRate: 0.01,
   },
   [CropType.Ragvete]: {
     type: CropType.Ragvete,
@@ -149,13 +163,84 @@ export const CROPS_DATA: Record<CropType, CropData> = {
     fertilizerCostPerHa: 2400,
     harvestCostPerHa: 800,
     plantQuarter: Quarter.Host,
-    harvestQuarter: Quarter.Host, // skördas hösten NÄSTA år
+    harvestQuarter: Quarter.Host,
     growingSeasons: 4,
+    spoilageRate: 0.01,
   },
 };
 
 /** Alias för bakåtkompatibilitet med engine */
 export const CROP_DATA = CROPS_DATA;
+
+/**
+ * Växtföljdseffekter: vilka förgrödor som gynnar/missgynnar varje gröda.
+ * goodPredecessors ger +8% yield, badPredecessors ger -5% yield (utöver monokulturstraff).
+ */
+export const ROTATION_EFFECTS: Record<CropType, {
+  goodPredecessors: CropType[];
+  badPredecessors: CropType[];
+}> = {
+  [CropType.Hostvete]: {
+    goodPredecessors: [CropType.Hostraps, CropType.Potatis, CropType.Vall, CropType.Trada, CropType.Sockerbeta],
+    badPredecessors: [], // monokulturstraff räcker
+  },
+  [CropType.Varkorn]: {
+    goodPredecessors: [CropType.Hostraps, CropType.Potatis, CropType.Sockerbeta, CropType.Vall, CropType.Trada],
+    badPredecessors: [CropType.Havre, CropType.Foderhavre, CropType.Grynhavre], // spannmål efter spannmål
+  },
+  [CropType.Havre]: {
+    goodPredecessors: [CropType.Hostvete, CropType.Varvete, CropType.Hostraps, CropType.Vall, CropType.Trada],
+    badPredecessors: [CropType.Varkorn, CropType.Foderkorn, CropType.Maltkorn],
+  },
+  [CropType.Hostraps]: {
+    goodPredecessors: [CropType.Hostvete, CropType.Varkorn, CropType.Havre, CropType.Hostrag],
+    badPredecessors: [CropType.Hostraps], // raps efter raps = klubbrot-risk
+  },
+  [CropType.Vall]: {
+    goodPredecessors: [], // vall trivs överallt
+    badPredecessors: [],
+  },
+  [CropType.Potatis]: {
+    goodPredecessors: [CropType.Vall, CropType.Trada, CropType.Hostvete, CropType.Varkorn],
+    badPredecessors: [CropType.Potatis, CropType.Sockerbeta], // nematod-risk
+  },
+  [CropType.Sockerbeta]: {
+    goodPredecessors: [CropType.Hostvete, CropType.Varkorn, CropType.Vall, CropType.Trada],
+    badPredecessors: [CropType.Sockerbeta, CropType.Potatis], // nematod-risk
+  },
+  [CropType.Trada]: {
+    goodPredecessors: [],
+    badPredecessors: [],
+  },
+  [CropType.Varvete]: {
+    goodPredecessors: [CropType.Hostraps, CropType.Potatis, CropType.Vall, CropType.Trada],
+    badPredecessors: [CropType.Hostvete], // vete efter vete
+  },
+  [CropType.Maltkorn]: {
+    goodPredecessors: [CropType.Hostraps, CropType.Potatis, CropType.Sockerbeta, CropType.Vall],
+    badPredecessors: [CropType.Varkorn, CropType.Foderkorn],
+  },
+  [CropType.Foderkorn]: {
+    goodPredecessors: [CropType.Hostraps, CropType.Vall, CropType.Trada],
+    badPredecessors: [CropType.Varkorn, CropType.Maltkorn],
+  },
+  [CropType.Grynhavre]: {
+    goodPredecessors: [CropType.Hostvete, CropType.Varvete, CropType.Hostraps, CropType.Vall],
+    badPredecessors: [CropType.Havre, CropType.Foderhavre],
+  },
+  [CropType.Foderhavre]: {
+    goodPredecessors: [CropType.Hostvete, CropType.Varvete, CropType.Hostraps, CropType.Vall],
+    badPredecessors: [CropType.Havre, CropType.Grynhavre],
+  },
+  [CropType.Hostrag]: {
+    goodPredecessors: [CropType.Hostraps, CropType.Potatis, CropType.Vall, CropType.Trada],
+    badPredecessors: [CropType.Ragvete],
+  },
+  [CropType.Ragvete]: {
+    goodPredecessors: [CropType.Hostraps, CropType.Potatis, CropType.Vall, CropType.Trada],
+    badPredecessors: [CropType.Hostrag],
+  },
+};
 
 /** Vilka kvartal varje gröda kan planteras */
 export const PLANTING_QUARTERS: Record<CropType, Quarter[]> = {

@@ -1,8 +1,6 @@
 import {
   CropType,
   Quarter,
-  MachineryLevel,
-  BuildingLevel,
   FieldStatus,
 } from "./enums";
 import { LivestockHerd } from "./livestock";
@@ -16,16 +14,30 @@ export interface Machine {
   maintenanceCostPerQuarter: number;
 }
 
+export interface Building {
+  id: string;           // Matches BuildingDef id
+  name: string;
+  type: "silo" | "maskinhall" | "stall" | "lada" | "verkstad";
+  builtYear: number;
+  maintenanceCostPerQuarter: number;
+  effects: {
+    siloCapacity?: number;
+    machineProtection?: boolean;
+    animalHealthBonus?: number;
+    animalCapacity?: number;
+    repairDiscount?: number;
+  };
+}
+
 export interface Farm {
   totalHectares: number;
   fields: Field[];
   livestock: LivestockHerd[];
-  machinery: MachineryLevel;
-  buildings: BuildingLevel;
   employees: number;
   storage: Record<string, number>; // ton lagrad spannmål per CropType
-  siloCapacity: number; // max ton totalt
+  siloCapacity: number; // max ton totalt (beräknas från byggnader)
   machines: Machine[];
+  buildings: Building[];  // Individuella byggnader
 }
 
 export interface Field {
@@ -33,13 +45,14 @@ export interface Field {
   name: string;
   hectares: number;
   crop: CropType | null;
-  soilQuality: number; // 0.8 - 1.2
+  soilQuality: number; // 0.6 - 1.3 (dynamisk, påverkas av brukande)
   fertilizerApplied: boolean;
   status: FieldStatus;
   plantedYear: number | null;
   plantedQuarter: Quarter | null;
   leased?: boolean; // true if this field is leased (recurring cost)
   leaseAnnualCost?: number; // yearly lease cost (charged quarterly)
+  previousCrops: CropType[]; // Historik över senaste 4 grödorna (index 0 = senaste)
 }
 
 export interface CropData {
@@ -51,4 +64,5 @@ export interface CropData {
   plantQuarter: Quarter;
   harvestQuarter: Quarter;
   growingSeasons: number; // min antal kvartal från sådd till skörd
+  spoilageRate: number; // % förlust per kvartal i lager (0.01 = 1%)
 }

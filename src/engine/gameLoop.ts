@@ -10,11 +10,9 @@ import {
   Quarter,
   Region,
   CropType,
-  MachineryLevel,
-  BuildingLevel,
   type Farm,
   type Field,
-  type RevenueBreakdown,
+  type Building,
   type CostBreakdown,
   type QuarterRecord,
 } from "@/types";
@@ -22,15 +20,17 @@ import {
 import { CROPS_DATA } from "@/data/crops";
 import { LIVESTOCK_DATA } from "@/data/livestock";
 import { REGIONS_DATA } from "@/data/regions";
-import { MACHINERY_UPGRADES, BUILDING_UPGRADES, STARTER_MACHINES } from "@/data/machinery";
+import { REPAIR_COSTS, REPAIR_CONDITION_BOOST } from "@/data/machinery";
+import { BUILDING_CATALOG, MACHINE_SHOP } from "@/data/buildings";
 
 import { createRandom } from "@/lib/random";
 import { generateWeather } from "./weather";
 import { generateMarketPrices } from "./market";
-import { calculateYield, elapsedQuarters } from "./crops";
+import { calculateYield, elapsedQuarters, updateSoilQuality, getWorkerEfficiencyModifier, getMachineConditionModifier } from "./crops";
 import {
   calculateQuarterlyLivestockRevenue,
   applyHealthChange,
+  getWorkerHealthEffect,
 } from "./livestock";
 import { calculateSubsidies } from "./subsidies";
 import { calculateQuarterlyPayment, processLoanPayment, createLoan } from "./loans";
@@ -134,6 +134,7 @@ export function createInitialGameState(params: {
       status: "Oplöjd",
       plantedYear: null,
       plantedQuarter: null,
+      previousCrops: [],
     });
   }
 
@@ -171,12 +172,16 @@ export function createInitialGameState(params: {
       totalHectares,
       fields,
       livestock: [],
-      machinery: MachineryLevel.Basic,
-      buildings: BuildingLevel.Simple,
       employees: 1,
       storage: {},
-      siloCapacity: Math.round(totalHectares * 5), // ~5 ton/ha kapacitet
-      machines: STARTER_MACHINES[MachineryLevel.Basic].map((m) => ({ ...m, purchaseYear: 1 })),
+      siloCapacity: 50, // Beräknas från byggnader + basvärde 50 ton
+      machines: [
+        { id: "m-1", name: "Traktor (begagnad)", type: "traktor", purchaseYear: 1, condition: 0.7, maintenanceCostPerQuarter: 3000 },
+        { id: "m-2", name: "Enkel plog", type: "plog", purchaseYear: 1, condition: 0.8, maintenanceCostPerQuarter: 1000 },
+        { id: "m-3", name: "Tallriksharv", type: "harv", purchaseYear: 1, condition: 0.75, maintenanceCostPerQuarter: 800 },
+        { id: "m-4", name: "Såmaskin (äldre)", type: "saamaskin", purchaseYear: 1, condition: 0.65, maintenanceCostPerQuarter: 1200 },
+      ],
+      buildings: [], // Startar med enkel lada (inbyggd 50 ton), inga specialbyggnader
     },
     finances: {
       cashBalance: startingCapital + loanAmount,
@@ -187,6 +192,7 @@ export function createInitialGameState(params: {
     activeEvents: [],
     seed,
     currentMarketPrices: generateMarketPrices(seed, 1, Quarter.Var),
+    priceHistory: {},
     pendingLandOffers: [],
   };
 }
@@ -310,39 +316,78 @@ export function advanceQuarter(
     cash += decisions.newLoan.amount;
   }
 
-  // ---- Step 5: Machinery/building upgrades ----
-  let machinery = farm.machinery;
-  let buildings = farm.buildings;
-
+  // ---- Step 5: Machine purchases, repairs, building construction ----
   let machines = (farm.machines || []).map((m) => ({ ...m }));
+  let farmBuildings: Building[] = (farm.buildings || []).map((b) => ({ ...b }));
 
-  if (decisions.machineryUpgrade) {
-    const upgrade = MACHINERY_UPGRADES.find((u) => u.from === machinery);
-    if (upgrade) {
-      cash -= upgrade.cost;
-      machinery = upgrade.to;
-      // Replace machines with the new level's set
-      machines = STARTER_MACHINES[upgrade.to].map((m) => ({ ...m, purchaseYear: currentYear }));
+  // Process machine repairs (with workshop discount if available)
+  const hasWorkshop = farmBuildings.some((b) => b.type === "verkstad");
+  const repairDiscount = hasWorkshop
+    ? farmBuildings.find((b) => b.type === "verkstad")?.effects.repairDiscount ?? 0
+    : 0;
+  for (const machineId of (decisions.repairMachines || [])) {
+    const machineIdx = machines.findIndex((m) => m.id === machineId);
+    if (machineIdx !== -1) {
+      const machine = machines[machineIdx];
+      const baseCost = REPAIR_COSTS[machine.type] ?? 15000;
+      const repairCost = Math.round(baseCost * (1 - repairDiscount));
+      cash -= repairCost;
+      machines[machineIdx] = {
+        ...machine,
+        condition: Math.min(1.0, Math.round((machine.condition + REPAIR_CONDITION_BOOST) * 100) / 100),
+      };
     }
   }
 
-  if (decisions.buildingUpgrade) {
-    const upgrade = BUILDING_UPGRADES.find((u) => u.from === buildings);
-    if (upgrade) {
-      cash -= upgrade.cost;
-      buildings = upgrade.to;
+  // Process new machine purchases
+  for (const shopId of (decisions.buyMachines || [])) {
+    const def = MACHINE_SHOP.find((m) => m.id === shopId);
+    if (def) {
+      cash -= def.cost;
+      machines.push({
+        id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: def.name,
+        type: def.type,
+        purchaseYear: currentYear,
+        condition: def.condition,
+        maintenanceCostPerQuarter: def.maintenanceCostPerQuarter,
+      });
     }
   }
+
+  // Process building construction
+  for (const buildingId of (decisions.constructBuildings || [])) {
+    const def = BUILDING_CATALOG.find((b) => b.id === buildingId);
+    if (def) {
+      cash -= def.cost;
+      farmBuildings.push({
+        id: def.id,
+        name: def.name,
+        type: def.type,
+        builtYear: currentYear,
+        maintenanceCostPerQuarter: def.maintenanceCostPerQuarter,
+        effects: { ...def.effects },
+      });
+    }
+  }
+
+  // Derive silo capacity from buildings (base 50 ton lada + all silo buildings)
+  const siloCapacity = 50 + farmBuildings.reduce((sum, b) => sum + (b.effects.siloCapacity ?? 0), 0);
+
+  // Derive machinery efficiency from individual machine bonuses
+  const machineryEfficiency = 1.0 + MACHINE_SHOP
+    .filter((def) => machines.some((m) => m.name === def.name))
+    .reduce((max, def) => Math.max(max, def.efficiencyBonus ?? 0), 0);
 
   // ---- Step 6: Generate weather ----
   const weather = generateWeather(currentQuarter, seed, currentYear);
 
   // ---- Step 7: Calculate crop yields → harvest to storage ----
   const storage: Record<string, number> = { ...(farm.storage || {}) };
-  const siloCapacity = farm.siloCapacity || 500;
   const harvestedCrops: Record<string, number> = {};
 
-  for (const field of fields) {
+  for (let fi = 0; fi < fields.length; fi++) {
+    const field = fields[fi];
     if (!field.crop) continue;
     const cropData = CROPS_DATA[field.crop];
 
@@ -358,25 +403,50 @@ export function advanceQuarter(
       field.status !== "Skördad" &&
       elapsed >= cropData.growingSeasons
     ) {
+      // Unique seed per field per year for natural yield variation
+      const fieldSeed = seed + currentYear * 1009 + fi * 137;
       const tons = calculateYield(
         field.crop,
         field.hectares,
         field.soilQuality,
         field.fertilizerApplied,
         weather,
-        regionData.yieldModifier
+        regionData.yieldModifier,
+        field.previousCrops,
+        newEmployees,
+        farm.totalHectares,
+        machines,
+        machineryEfficiency,
+        fieldSeed
       );
 
       const rounded = Math.round(tons * 10) / 10;
       harvestedCrops[field.crop] = (harvestedCrops[field.crop] ?? 0) + rounded;
       storage[field.crop] = (storage[field.crop] ?? 0) + rounded;
 
+      // Update soil quality based on harvest
+      field.soilQuality = updateSoilQuality(field.soilQuality, field.crop, true, field.fertilizerApplied);
+
+      // Track crop rotation history
+      field.previousCrops = [field.crop, ...(field.previousCrops || [])].slice(0, 4);
+
       field.status = "Skördad";
     }
   }
 
+  // ---- Step 7b: Apply spoilage to stored crops ----
+  for (const [crop, tons] of Object.entries(storage)) {
+    const cropData = CROPS_DATA[crop as CropType];
+    if (cropData && cropData.spoilageRate > 0 && tons > 0) {
+      const spoiled = Math.round(tons * cropData.spoilageRate * 10) / 10;
+      storage[crop] = Math.round((tons - spoiled) * 10) / 10;
+      if (storage[crop] <= 0) delete storage[crop];
+    }
+  }
+
   // ---- Step 8: Generate market prices ----
-  const marketPrices = generateMarketPrices(seed, currentYear, currentQuarter);
+  const previousPrices = state.currentMarketPrices as Record<CropType, number>;
+  const marketPrices = generateMarketPrices(seed, currentYear, currentQuarter, previousPrices);
 
   // Sell overflow that doesn't fit in silo at current market price
   let overflowRevenue = 0;
@@ -438,12 +508,11 @@ export function advanceQuarter(
       totalHectares: farm.totalHectares,
       fields,
       livestock,
-      machinery,
-      buildings,
       employees: newEmployees,
       storage,
       siloCapacity,
       machines,
+      buildings: farmBuildings,
     };
     const newSubsidies = calculateSubsidies(
       updatedFarm,
@@ -475,12 +544,11 @@ export function advanceQuarter(
     totalHectares: farm.totalHectares,
     fields,
     livestock,
-    machinery,
-    buildings,
     employees: newEmployees,
     storage,
     siloCapacity,
     machines,
+    buildings: farmBuildings,
   };
 
   const costs = calculateQuarterCosts({
@@ -489,6 +557,7 @@ export function advanceQuarter(
     livestock,
     loans,
     quarter: currentQuarter,
+    storage,
   });
 
   // ---- Step 13: Process loan payments ----
@@ -519,6 +588,23 @@ export function advanceQuarter(
   // Apply event health effects to livestock
   if (eventState.healthDelta !== 0) {
     livestock = applyHealthChange(livestock, eventState.healthDelta);
+  }
+
+  // Apply worker staffing effect on animal health
+  const totalAnimals = livestock.reduce((sum, h) => sum + h.count, 0);
+  const workerHealthDelta = getWorkerHealthEffect(newEmployees, totalAnimals);
+  if (workerHealthDelta !== 0) {
+    livestock = applyHealthChange(livestock, workerHealthDelta);
+  }
+
+  // Apply building health bonus for livestock (from stalls)
+  if (totalAnimals > 0) {
+    const buildingHealthBonus = farmBuildings.reduce(
+      (sum, b) => sum + (b.effects.animalHealthBonus ?? 0), 0
+    );
+    if (buildingHealthBonus > 0) {
+      livestock = applyHealthChange(livestock, buildingHealthBonus);
+    }
   }
   // Track event income/costs for the financial record (flows through revenue/costs, not direct cash)
   const eventIncome = Math.max(0, eventState.directCashChange);
@@ -572,6 +658,7 @@ export function advanceQuarter(
     adjustedCosts.loanAmortization +
     adjustedCosts.insurance +
     adjustedCosts.buildingMaintenance +
+    adjustedCosts.storageCosts +
     adjustedCosts.other;
 
   cash += totalRevenue - totalCosts;
@@ -602,26 +689,33 @@ export function advanceQuarter(
 
   // Advance field growth statuses between quarters
   const advancedFields = fields.map((f) => {
+    // Update soil quality for fallow/grass fields each quarter
+    let soilQuality = f.soilQuality;
+    if (f.crop === CropType.Trada || f.crop === CropType.Vall) {
+      soilQuality = updateSoilQuality(soilQuality, f.crop, false, false);
+    }
+
     if (f.status === "Sådd")
-      return { ...f, status: "Växande" as const };
+      return { ...f, soilQuality, status: "Växande" as const };
     if (f.status === "Växande")
-      return { ...f, status: "Skördeklar" as const };
+      return { ...f, soilQuality, status: "Skördeklar" as const };
     if (f.status === "Skördad")
       return {
         ...f,
+        soilQuality,
         crop: null,
         status: "Oplöjd" as const,
         fertilizerApplied: false,
         plantedYear: null,
         plantedQuarter: null,
       };
-    return f;
+    return { ...f, soilQuality };
   });
 
   // Pre-harvest: harvest any crops that are ready in the upcoming quarter
   // so fields are available for planting when the player sees the decision screen.
   const nextWeather = generateWeather(nextQuarter, seed, nextYear);
-  const finalFields = advancedFields.map((f) => {
+  const finalFields = advancedFields.map((f, fi) => {
     if (!f.crop || f.status === "Oplöjd" || f.status === "Skördad") return f;
     const cropData = CROPS_DATA[f.crop];
     if (cropData.harvestQuarter !== nextQuarter) return f;
@@ -630,13 +724,23 @@ export function advanceQuarter(
     const elapsed = elapsedQuarters(f.plantedYear!, f.plantedQuarter!, nextYear, nextQuarter);
     if (elapsed < cropData.growingSeasons) return f;
 
-    // Harvest this field now
+    // Harvest this field now (unique seed per field per year)
+    const fieldSeed = seed + nextYear * 1009 + fi * 137;
     const tons = calculateYield(
       f.crop, f.hectares, f.soilQuality, f.fertilizerApplied,
-      nextWeather, regionData.yieldModifier
+      nextWeather, regionData.yieldModifier,
+      f.previousCrops, newEmployees, farm.totalHectares, machines,
+      machineryEfficiency, fieldSeed
     );
     const rounded = Math.round(tons * 10) / 10;
     storage[f.crop] = (storage[f.crop] ?? 0) + rounded;
+
+    // Track pre-harvested crops so they show in the quarter summary
+    harvestedCrops[f.crop] = (harvestedCrops[f.crop] ?? 0) + rounded;
+
+    // Update soil quality and rotation history for pre-harvested fields
+    const updatedSoilQuality = updateSoilQuality(f.soilQuality, f.crop, true, f.fertilizerApplied);
+    const updatedPreviousCrops = [f.crop, ...(f.previousCrops || [])].slice(0, 4);
 
     return {
       ...f,
@@ -645,11 +749,15 @@ export function advanceQuarter(
       fertilizerApplied: false,
       plantedYear: null,
       plantedQuarter: null,
+      soilQuality: updatedSoilQuality,
+      previousCrops: updatedPreviousCrops,
     };
   });
 
-  // Sell overflow from pre-harvest at next quarter's market prices
-  const nextMarketPrices = generateMarketPrices(seed, nextYear, nextQuarter);
+  // Sell overflow from pre-harvest at current market prices
+  // This revenue must be added to cash and financial record since they were
+  // already computed before the pre-harvest ran.
+  let preHarvestOverflowRevenue = 0;
   const totalStoredFinal = Object.values(storage).reduce((a, b) => a + b, 0);
   if (totalStoredFinal > siloCapacity) {
     const overflow = totalStoredFinal - siloCapacity;
@@ -663,7 +771,7 @@ export function advanceQuarter(
         remaining
       );
       if (sellTons > 0) {
-        overflowRevenue += sellTons * (nextMarketPrices[crop as CropType] ?? 0);
+        preHarvestOverflowRevenue += sellTons * (marketPrices[crop as CropType] ?? 0);
         storage[crop] = Math.round((stored - sellTons) * 10) / 10;
         if (storage[crop] <= 0) delete storage[crop];
         remaining -= sellTons;
@@ -671,13 +779,26 @@ export function advanceQuarter(
     }
   }
 
+  // Add pre-harvest overflow revenue to cash and financial record
+  // (revenue object is shared with financialRecord.revenue, so updating it
+  //  also updates the record's revenue breakdown)
+  if (preHarvestOverflowRevenue > 0) {
+    const rounded = Math.round(preHarvestOverflowRevenue);
+    cash += rounded;
+    revenue.cropSales += rounded;
+    financialRecord.netResult += rounded;
+    financialRecord.cashBalanceEnd += rounded;
+  }
+
   const gameEnded =
     nextYear > state.totalYears && nextQuarter === Quarter.Var;
 
-  // Degrade machine condition each quarter
+  // Degrade machine condition each quarter (slower if maskinhall exists)
+  const hasMachineHall = farmBuildings.some((b) => b.type === "maskinhall");
+  const degradeRate = hasMachineHall ? 0.01 : 0.02; // Maskinhall halves degradation
   machines = machines.map((m) => ({
     ...m,
-    condition: Math.max(0.1, Math.round((m.condition - 0.02) * 100) / 100),
+    condition: Math.max(0.1, Math.round((m.condition - degradeRate) * 100) / 100),
     maintenanceCostPerQuarter: m.condition < 0.4
       ? Math.round(m.maintenanceCostPerQuarter * 1.5)
       : m.maintenanceCostPerQuarter,
@@ -730,12 +851,11 @@ export function advanceQuarter(
       totalHectares: farm.totalHectares,
       fields: finalFields,
       livestock,
-      machinery,
-      buildings,
       employees: newEmployees,
       storage,
       siloCapacity,
       machines,
+      buildings: farmBuildings,
     },
     finances: {
       cashBalance: Math.round(cash),
@@ -746,6 +866,23 @@ export function advanceQuarter(
     activeEvents: events,
     seed: state.seed,
     currentMarketPrices: marketPrices,
+    priceHistory: updatePriceHistory(state.priceHistory || {}, marketPrices),
     pendingLandOffers: landOffers,
+    lastHarvestedCrops: harvestedCrops,
   };
+}
+
+/**
+ * Append current prices to price history, keeping last 8 quarters per crop.
+ */
+function updatePriceHistory(
+  history: Record<string, number[]>,
+  currentPrices: Record<CropType, number>
+): Record<string, number[]> {
+  const updated: Record<string, number[]> = {};
+  for (const [crop, price] of Object.entries(currentPrices)) {
+    const prev = history[crop] || [];
+    updated[crop] = [...prev, price].slice(-8);
+  }
+  return updated;
 }
