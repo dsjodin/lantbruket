@@ -429,7 +429,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           ...state.farm,
           totalHectares: newTotalHa,
           fields: [...state.farm.fields, ...newFields],
-          siloCapacity: Math.round(newTotalHa * 5),
+          siloCapacity: state.farm.siloCapacity, // Preserved; upgraded via buildings
         },
         finances: {
           ...state.finances,
@@ -578,7 +578,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         // Migrate: add missing storage/siloCapacity
         if (!gameState.farm.storage) gameState.farm.storage = {};
-        if (!gameState.farm.siloCapacity) gameState.farm.siloCapacity = 500;
+        if (!gameState.farm.siloCapacity) gameState.farm.siloCapacity = 200;
 
         // Migrate: add missing currentMarketPrices
         if (!gameState.currentMarketPrices) gameState.currentMarketPrices = {};

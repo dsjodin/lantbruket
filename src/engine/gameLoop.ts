@@ -177,7 +177,7 @@ export function createInitialGameState(params: {
       buildings: BuildingLevel.Simple,
       employees: 1,
       storage: {},
-      siloCapacity: Math.round(totalHectares * 5), // ~5 ton/ha kapacitet
+      siloCapacity: 200, // Grundkapacitet i ton (utökas via byggnadsuppgradering)
       machines: STARTER_MACHINES[MachineryLevel.Basic].map((m) => ({ ...m, purchaseYear: 1 })),
     },
     finances: {
@@ -354,14 +354,11 @@ export function advanceQuarter(
     }
   }
 
-  // Apply building upgrade effects: increased silo capacity
-  let siloCapacity = farm.siloCapacity || Math.round(farm.totalHectares * 5);
-  const baseSiloCapacity = Math.round(farm.totalHectares * 5);
-  if (buildings === BuildingLevel.Standard) {
-    siloCapacity = Math.round(baseSiloCapacity * 1.5); // +50% kapacitet
-  } else if (buildings === BuildingLevel.Expanded) {
-    siloCapacity = Math.round(baseSiloCapacity * 2.0); // +100% kapacitet
-  }
+  // Apply building upgrade effects: silo capacity per building level
+  const siloCapacity =
+    buildings === BuildingLevel.Expanded ? 800 :   // Utbyggd: 800 ton
+    buildings === BuildingLevel.Standard ? 500 :   // Standard: 500 ton
+    200;                                            // Enkel: 200 ton
 
   // ---- Step 6: Generate weather ----
   const weather = generateWeather(currentQuarter, seed, currentYear);
