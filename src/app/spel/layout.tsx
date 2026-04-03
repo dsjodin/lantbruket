@@ -32,14 +32,16 @@ export default function SpelLayout({ children }: { children: React.ReactNode }) 
   const pendingAchievementToasts = useGameStore((s) => s.pendingAchievementToasts);
   const dismissAchievementToast = useGameStore((s) => s.dismissAchievementToast);
 
+  const load = useGameStore((s) => s.load);
+
   useEffect(() => {
     if (!state) {
-      const saved = localStorage.getItem("lantbruket-save");
-      if (!saved) {
+      const loaded = load();
+      if (!loaded) {
         router.push("/");
       }
     }
-  }, [state, router]);
+  }, [state, load, router]);
 
   if (!state) {
     return (
