@@ -279,7 +279,8 @@ function getSubsidyEstimate(type: SubsidyType, state: NonNullable<ReturnType<typ
 
   switch (type) {
     case "Grundbetalning": return Math.round(ha * regionData.grundbetalningPerHa);
-    case "Förgröningsstöd": return (ha > 30 && distinctCrops.size < 3) ? 0 : Math.round(ha * 700);
+    case "Omfördelningsstöd": return Math.round(ha * 181);
+    case "Eco-scheme": return (ha > 30 && distinctCrops.size < 3) ? 0 : Math.round(ha * 453);
     case "Kompensationsstöd": return Math.round(ha * regionData.kompensationsstodPerHa);
     case "Miljöersättning": return Math.round(Math.floor(ha * 0.5) * 900);
     case "Djurvälfärdsersättning": {
@@ -288,7 +289,7 @@ function getSubsidyEstimate(type: SubsidyType, state: NonNullable<ReturnType<typ
     }
     case "Nötkreatursstöd": {
       const cows = state.farm.livestock.filter(h => h.type === "Mjölkko" || h.type === "Diko").reduce((s, h) => s + h.count, 0);
-      return cows * 1050;
+      return cows * 1031;
     }
     default: return 0;
   }
@@ -302,7 +303,8 @@ function WinterDecisions() {
 
   const subsidyTypes: SubsidyType[] = [
     "Grundbetalning",
-    "Förgröningsstöd",
+    "Omfördelningsstöd",
+    "Eco-scheme",
     "Kompensationsstöd",
     "Miljöersättning",
     "Djurvälfärdsersättning",
@@ -310,7 +312,7 @@ function WinterDecisions() {
   ];
 
   // Pre-check basic subsidies that virtually all Swedish farmers apply for
-  const defaultSubsidies: SubsidyType[] = ["Grundbetalning", "Förgröningsstöd"];
+  const defaultSubsidies: SubsidyType[] = ["Grundbetalning", "Omfördelningsstöd", "Eco-scheme"];
   const [applied, setApplied] = useState<SubsidyType[]>(
     pendingDecisions.subsidyApplications.length > 0
       ? pendingDecisions.subsidyApplications

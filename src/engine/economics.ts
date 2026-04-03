@@ -15,14 +15,16 @@ import {
 import type { LivestockHerd } from "@/types";
 import { CROPS_DATA } from "@/data/crops";
 // Machine and building maintenance is now calculated from individual items on farm
-import { STORAGE_COST_PER_TON_PER_QUARTER } from "@/data/costs";
+import {
+  FUEL_COST_PER_HA,
+  INSURANCE_PER_HA,
+  SALARY_PER_MONTH,
+  STORAGE_COST_PER_TON_PER_QUARTER,
+  ADMIN_COST_PER_HA_PER_YEAR,
+  ADMIN_COST_PER_ANIMAL_PER_YEAR,
+} from "@/data/costs";
 import { calculateQuarterlyLivestockCosts } from "./livestock";
 import { calculateQuarterlyPayment } from "./loans";
-
-// Cost constants (per quarter unless stated otherwise)
-const FUEL_COST_PER_HA_PER_YEAR = 400;
-const INSURANCE_COST_PER_HA_PER_YEAR = 200;
-const SALARY_PER_EMPLOYEE_PER_QUARTER = 100000;
 
 /**
  * Calculate total quarterly revenue from all sources.
@@ -79,7 +81,7 @@ export function calculateQuarterCosts(params: {
 
   // Fuel costs based on total hectares in use (quarterly)
   const usedHectares = fields.reduce((sum, f) => sum + f.hectares, 0);
-  const fuel = (usedHectares * FUEL_COST_PER_HA_PER_YEAR) / 4;
+  const fuel = (usedHectares * FUEL_COST_PER_HA) / 4;
 
   // Machinery maintenance (quarterly, sum of all machines)
   const machinery = (farm.machines || []).reduce(
@@ -89,8 +91,8 @@ export function calculateQuarterCosts(params: {
   // Livestock costs
   const livestockCosts = calculateQuarterlyLivestockCosts(livestock);
 
-  // Salaries
-  const salaries = farm.employees * SALARY_PER_EMPLOYEE_PER_QUARTER;
+  // Salaries (monthly salary * 3 months per quarter)
+  const salaries = farm.employees * SALARY_PER_MONTH * 3;
 
   // Loan payments
   let loanInterest = 0;
@@ -103,7 +105,7 @@ export function calculateQuarterCosts(params: {
   }
 
   // Insurance (quarterly)
-  const insurance = (farm.totalHectares * INSURANCE_COST_PER_HA_PER_YEAR) / 4;
+  const insurance = (farm.totalHectares * INSURANCE_PER_HA) / 4;
 
   // Building maintenance (quarterly, sum of all buildings)
   const buildingMaintenance = (farm.buildings || []).reduce(
@@ -114,6 +116,10 @@ export function calculateQuarterCosts(params: {
   const leaseCosts = fields
     .filter((f) => f.leased && f.leaseAnnualCost)
     .reduce((sum, f) => sum + (f.leaseAnnualCost! / 4), 0);
+
+  // Admin costs (quarterly: administration, advisory, bookkeeping)
+  const totalAnimals = livestock.reduce((sum, h) => sum + h.count, 0);
+  const adminCosts = (farm.totalHectares * ADMIN_COST_PER_HA_PER_YEAR + totalAnimals * ADMIN_COST_PER_ANIMAL_PER_YEAR) / 4;
 
   // Storage costs based on total tons stored
   const totalStored = storage
@@ -134,7 +140,7 @@ export function calculateQuarterCosts(params: {
     insurance: Math.round(insurance),
     buildingMaintenance: Math.round(buildingMaintenance),
     storageCosts: Math.round(storageCosts),
-    other: Math.round(leaseCosts),
+    other: Math.round(leaseCosts + adminCosts),
   };
 }
 

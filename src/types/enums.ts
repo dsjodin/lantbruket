@@ -71,7 +71,8 @@ export type GamePhase =
 
 export type SubsidyType =
   | "Grundbetalning"
-  | "Förgröningsstöd"
+  | "Omfördelningsstöd"
+  | "Eco-scheme"
   | "Kompensationsstöd"
   | "Miljöersättning"
   | "Djurvälfärdsersättning"

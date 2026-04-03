@@ -14,7 +14,7 @@ export interface CreditAssessment {
   reason?: string;
 }
 
-const LAND_VALUE_PER_HA = 50000;
+const LAND_VALUE_PER_HA = 120000;
 
 /**
  * Assess a farm's creditworthiness based on assets, debt, and cash flow.
@@ -47,7 +47,7 @@ export function assessCreditworthiness(state: GameState): CreditAssessment {
     : 0;
 
   // Determine interest rate based on risk
-  let baseRate = 0.045;
+  let baseRate = 0.035;
   if (debtToAssetRatio > 0.5) baseRate += 0.02;
   else if (debtToAssetRatio > 0.3) baseRate += 0.01;
   if (avgNetResult < 0) baseRate += 0.015;

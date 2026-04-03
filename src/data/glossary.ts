@@ -7,8 +7,10 @@ export const GLOSSARY: Record<string, string> = {
     "EU:s direktstöd till jordbrukare baserat på areal. Kallas även grundbetalning.",
   Grundbetalning:
     "Den största delen av EU:s arealbaserade stöd. Beloppet varierar beroende på region.",
-  Förgröningsstöd:
-    "Tilläggsstöd från EU som kräver att jordbrukaren uppfyller vissa miljövillkor, t.ex. gröddiversifiering.",
+  Omfördelningsstöd:
+    "Tilläggsstöd från EU (16,40 EUR/ha) som betalas till alla jordbrukare med stödberättigad mark.",
+  "Eco-scheme":
+    "Miljöersättning inom CAP (41 EUR/ha) för precisionsjordbruk och hållbar odlingsplanering. Kräver grödmångfald.",
   Kompensationsstöd:
     "Stöd till jordbrukare i områden med sämre odlingsförutsättningar, t.ex. skogsbygder och norrland.",
   Miljöersättning:
