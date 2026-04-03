@@ -10,6 +10,8 @@ import { REPAIR_COSTS } from "@/data/machinery";
 import { getMachineConditionModifier } from "@/engine/crops";
 import { calculateScore } from "@/engine/scoring";
 import FarmMap from "@/components/game/FarmMap";
+import SeasonBriefing from "@/components/game/SeasonBriefing";
+import QuarterTimeline from "@/components/game/QuarterTimeline";
 import {
   LineChart,
   Line,
@@ -44,6 +46,8 @@ export default function OversiktPage() {
   const state = useGameStore((s) => s.state);
   if (!state) return null;
 
+  const showSeasonBriefing = useGameStore((s) => s.showSeasonBriefing);
+  const dismissSeasonBriefing = useGameStore((s) => s.dismissSeasonBriefing);
   const { farm, finances, history, currentQuarter, currentYear } = state;
 
   const totalAnimals = farm.livestock.reduce((sum, h) => sum + h.count, 0);
@@ -98,6 +102,14 @@ export default function OversiktPage() {
 
   return (
     <div className="space-y-6">
+      {/* Quarter timeline */}
+      <QuarterTimeline />
+
+      {/* Season briefing */}
+      {showSeasonBriefing && (
+        <SeasonBriefing state={state} onDismiss={dismissSeasonBriefing} />
+      )}
+
       {/* Header with grade */}
       <div className="flex items-center justify-between">
         <div>
@@ -204,7 +216,7 @@ export default function OversiktPage() {
 
       {/* Farm Health - 5 scoring dimensions */}
       <Card title="Gårdshälsa">
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           {[
             { label: "Ekonomi", value: breakdown.netWorth, color: "green" as const },
             { label: "Lönsamhet", value: breakdown.profitability, color: "blue" as const },
@@ -289,7 +301,7 @@ export default function OversiktPage() {
       {/* Financial chart */}
       {chartData.length > 0 && (
         <Card title="Ekonomisk utveckling">
-          <div className="h-64">
+          <div className="h-48 md:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />

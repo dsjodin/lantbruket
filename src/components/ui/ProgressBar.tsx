@@ -32,7 +32,7 @@ export default function ProgressBar({
       )}
       <div className="w-full bg-stone-200 rounded-full h-2.5">
         <div
-          className={`h-2.5 rounded-full transition-all ${barColors[color]}`}
+          className={`h-2.5 rounded-full transition-all duration-700 ease-out ${barColors[color]}`}
           style={{ width: `${percent}%` }}
         />
       </div>

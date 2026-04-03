@@ -8,33 +8,30 @@ interface FarmMapProps {
 }
 
 const STATUS_COLORS: Record<string, { fill: string; stroke: string }> = {
-  "Oplöjd":     { fill: "#a08060", stroke: "#8B7355" },
-  "Sådd":       { fill: "#c4b078", stroke: "#b09a60" },
-  "Växande":    { fill: "#4ade80", stroke: "#22c55e" },
-  "Skördeklar": { fill: "#fbbf24", stroke: "#f59e0b" },
-  "Skördad":    { fill: "#d6d3d1", stroke: "#a8a29e" },
+  "Opl\u00f6jd":     { fill: "#a08060", stroke: "#8B7355" },
+  "S\u00e5dd":       { fill: "#c4b078", stroke: "#b09a60" },
+  "V\u00e4xande":    { fill: "#4ade80", stroke: "#22c55e" },
+  "Sk\u00f6rdeklar": { fill: "#fbbf24", stroke: "#f59e0b" },
+  "Sk\u00f6rdad":    { fill: "#d6d3d1", stroke: "#a8a29e" },
 };
 
 const CROP_ICONS: Record<string, string> = {
-  "Höstvete": "🌾",
-  "Vårkorn": "🌾",
-  "Havre": "🌾",
-  "Höstraps": "🌻",
-  "Vall": "🌿",
-  "Potatis": "🥔",
-  "Sockerbeta": "🫘",
-  "Vårvete": "🌾",
-  "Maltkorn": "🍺",
-  "Foderkorn": "🌾",
-  "Grynhavre": "🌾",
-  "Foderhavre": "🌾",
-  "Höstråg": "🌾",
-  "Rågvete": "🌾",
+  "H\u00f6stvete": "\u{1F33E}",
+  "V\u00e5rkorn": "\u{1F33E}",
+  "Havre": "\u{1F33E}",
+  "H\u00f6straps": "\u{1F33B}",
+  "Vall": "\u{1F33F}",
+  "Potatis": "\u{1F954}",
+  "Sockerbeta": "\u{1FAD8}",
+  "V\u00e5rvete": "\u{1F33E}",
+  "Maltkorn": "\u{1F37A}",
+  "Foderkorn": "\u{1F33E}",
+  "Grynhavre": "\u{1F33E}",
+  "Foderhavre": "\u{1F33E}",
+  "H\u00f6str\u00e5g": "\u{1F33E}",
+  "R\u00e5gvete": "\u{1F33E}",
 };
 
-/**
- * Simple treemap layout: arranges fields as rectangles proportional to their hectares.
- */
 function layoutFields(
   fields: Field[],
   width: number,
@@ -54,10 +51,8 @@ function layoutFields(
   let i = 0;
 
   while (i < sorted.length) {
-    // Determine orientation: split along the longer axis
     const horizontal = remainingW >= remainingH;
 
-    // Take a strip of fields
     let stripArea = 0;
     const strip: Field[] = [];
     const targetStripSize = Math.max(1, Math.ceil((sorted.length - i) / 2));
@@ -111,14 +106,28 @@ export default function FarmMap({ fields, compact = false }: FarmMapProps) {
       className="w-full rounded-lg border border-stone-200 bg-stone-100"
       style={{ maxHeight: compact ? 200 : 360 }}
     >
+      <defs>
+        {/* Pulse animation for growing fields */}
+        <style>{`
+          @keyframes fieldPulse {
+            0%, 100% { opacity: 0.85; }
+            50% { opacity: 1; }
+          }
+          .field-growing { animation: fieldPulse 2s ease-in-out infinite; }
+          .field-rect { transition: fill 300ms ease, opacity 300ms ease; }
+          .field-group:hover .field-rect { filter: brightness(1.1); }
+          .field-group { cursor: pointer; }
+        `}</style>
+      </defs>
       {rects.map(({ field, x, y, w, h }) => {
-        const colors = STATUS_COLORS[field.status] || STATUS_COLORS["Oplöjd"];
-        const icon = field.crop ? (CROP_ICONS[field.crop] || "🌱") : "";
+        const colors = STATUS_COLORS[field.status] || STATUS_COLORS["Opl\u00f6jd"];
+        const icon = field.crop ? (CROP_ICONS[field.crop] || "\u{1F331}") : "";
         const showText = w > 40 && h > 25;
         const showDetails = !compact && w > 60 && h > 40;
+        const isGrowing = field.status === "V\u00e4xande";
 
         return (
-          <g key={field.id}>
+          <g key={field.id} className="field-group">
             <rect
               x={x + padding}
               y={y + padding}
@@ -129,8 +138,8 @@ export default function FarmMap({ fields, compact = false }: FarmMapProps) {
               stroke={colors.stroke}
               strokeWidth={1.5}
               opacity={field.crop ? 0.9 : 0.6}
+              className={`field-rect ${isGrowing ? "field-growing" : ""}`}
             />
-            {/* Field name */}
             {showText && (
               <text
                 x={x + w / 2}
@@ -145,7 +154,6 @@ export default function FarmMap({ fields, compact = false }: FarmMapProps) {
                 {field.name}
               </text>
             )}
-            {/* Crop + hectares */}
             {showDetails && (
               <>
                 <text
