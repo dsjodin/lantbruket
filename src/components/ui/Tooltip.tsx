@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 interface TooltipProps {
   text: string;
@@ -9,12 +9,27 @@ interface TooltipProps {
 
 export default function Tooltip({ text, children }: TooltipProps) {
   const [show, setShow] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  // Close on outside tap (mobile)
+  useEffect(() => {
+    if (!show) return;
+    const handler = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setShow(false);
+      }
+    };
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, [show]);
 
   return (
     <span
+      ref={ref}
       className="relative inline-block"
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
+      onClick={() => setShow((v) => !v)}
     >
       {children}
       {show && (

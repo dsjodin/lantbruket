@@ -38,6 +38,7 @@ export interface GameState {
   priceHistory: Record<string, number[]>; // Senaste 8 kvartalens priser per gröda
   pendingLandOffers: LandOffer[];
   lastHarvestedCrops?: Record<string, number>; // Faktisk skörd (oberoende av silokapacitet)
+  unlockedAchievements: string[];
 }
 
 export interface QuarterDecisions {

@@ -130,3 +130,18 @@ export function calculateScore(
 
   return { score, grade, breakdown };
 }
+
+/**
+ * Calculate improvement streak: consecutive quarters of positive net result.
+ */
+export function calculateStreak(state: GameState): number {
+  let streak = 0;
+  for (let i = state.history.length - 1; i >= 0; i--) {
+    if (state.history[i].financialRecord.netResult > 0) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}

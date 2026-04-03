@@ -9,6 +9,8 @@ import {
   createInitialGameState,
   advanceQuarter,
 } from "@/engine/gameLoop";
+import { checkAchievements } from "@/engine/achievements";
+import { type AchievementDef } from "@/data/achievements";
 import { REPAIR_COSTS, REPAIR_CONDITION_BOOST } from "@/data/machinery";
 import { BUILDING_CATALOG, MACHINE_SHOP } from "@/data/buildings";
 
@@ -52,9 +54,12 @@ interface GameStore {
   messages: { text: string; type: "success" | "error" | "info" }[];
   showQuarterSummary: boolean;
   lastQuarterResult: QuarterResult | null;
-  quarterGrainSalesRevenue: number; // Tracks manual grain sales during the quarter
-  quarterStartCash: number; // Cash at the start of the quarter (before manual actions)
-  pendingCropCosts: number; // Tracks seed/fertilizer costs committed this quarter (not yet deducted by engine)
+  quarterGrainSalesRevenue: number;
+  quarterStartCash: number;
+  pendingCropCosts: number;
+  pendingAchievementToasts: AchievementDef[];
+  showSeasonBriefing: boolean;
+  previousScore: number;
 
   startGame: (params: {
     playerName: string;
@@ -85,6 +90,8 @@ interface GameStore {
   updateDecisions: (partial: Partial<QuarterDecisions>) => void;
   advanceQuarter: () => void;
   dismissSummary: () => void;
+  dismissAchievementToast: () => void;
+  dismissSeasonBriefing: () => void;
   clearMessages: () => void;
   save: () => void;
   load: () => boolean;
@@ -100,6 +107,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   quarterGrainSalesRevenue: 0,
   quarterStartCash: 0,
   pendingCropCosts: 0,
+  pendingAchievementToasts: [],
+  showSeasonBriefing: false,
+  previousScore: 50,
 
   startGame: (params) => {
     const gameState = createInitialGameState(params);
@@ -618,6 +628,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
       newState = { ...newState, history: patchedHistory };
     }
 
+    // Check achievements
+    const alreadyUnlocked = newState.unlockedAchievements || [];
+    const newAchievements = checkAchievements(newState, alreadyUnlocked);
+    if (newAchievements.length > 0) {
+      newState = {
+        ...newState,
+        unlockedAchievements: [...alreadyUnlocked, ...newAchievements.map((a) => a.id)],
+      };
+    }
+
     set({
       state: newState,
       pendingDecisions: { ...emptyDecisions },
@@ -627,13 +647,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
       quarterGrainSalesRevenue: 0,
       quarterStartCash: newState.finances.cashBalance,
       pendingCropCosts: 0,
+      pendingAchievementToasts: newAchievements,
     });
 
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(newState)); } catch {}
   },
 
   dismissSummary: () => {
-    set({ showQuarterSummary: false });
+    set({ showQuarterSummary: false, showSeasonBriefing: true });
+  },
+
+  dismissAchievementToast: () => {
+    set((s) => ({
+      pendingAchievementToasts: s.pendingAchievementToasts.slice(1),
+    }));
+  },
+
+  dismissSeasonBriefing: () => {
+    set({ showSeasonBriefing: false });
   },
 
   save: () => {
@@ -669,6 +700,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         // Migrate: add missing pendingLandOffers
         if (!gameState.pendingLandOffers) gameState.pendingLandOffers = [];
+
+        // Migrate: add missing unlockedAchievements
+        if (!gameState.unlockedAchievements) gameState.unlockedAchievements = [];
 
         // Migrate: add missing machines array
         if (!gameState.farm.machines) {

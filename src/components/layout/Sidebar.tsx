@@ -19,7 +19,7 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 bg-stone-800 text-stone-200 min-h-screen flex flex-col">
+    <aside className="hidden md:flex w-56 bg-stone-800 text-stone-200 min-h-screen flex-col">
       <Link href="/" className="px-4 py-4 border-b border-stone-700">
         <div className="flex items-center gap-2">
           <span className="text-2xl">🌾</span>

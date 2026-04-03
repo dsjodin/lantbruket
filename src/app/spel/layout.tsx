@@ -4,7 +4,13 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import TopBar from "@/components/layout/TopBar";
+import BottomNav from "@/components/layout/BottomNav";
+import FloatingAdvanceButton from "@/components/layout/FloatingAdvanceButton";
 import QuarterSummary from "@/components/game/QuarterSummary";
+import AchievementToast from "@/components/game/AchievementToast";
+import SeasonParticles from "@/components/effects/SeasonParticles";
+import DecisionTracker from "@/components/game/DecisionTracker";
+import PageTransition from "@/components/layout/PageTransition";
 import { useGameStore } from "@/store/gameStore";
 import { Quarter } from "@/types/enums";
 
@@ -23,6 +29,8 @@ export default function SpelLayout({ children }: { children: React.ReactNode }) 
   const showQuarterSummary = useGameStore((s) => s.showQuarterSummary);
   const lastQuarterResult = useGameStore((s) => s.lastQuarterResult);
   const dismissSummary = useGameStore((s) => s.dismissSummary);
+  const pendingAchievementToasts = useGameStore((s) => s.pendingAchievementToasts);
+  const dismissAchievementToast = useGameStore((s) => s.dismissAchievementToast);
 
   useEffect(() => {
     if (!state) {
@@ -61,13 +69,33 @@ export default function SpelLayout({ children }: { children: React.ReactNode }) 
           onAdvanceQuarter={advanceQuarter}
           phase={state.phase}
         />
-        <main className={`flex-1 p-6 overflow-auto transition-colors duration-500 ${mainBg}`}>
-          {children}
+        <DecisionTracker />
+        <main className={`flex-1 p-4 md:p-6 pb-24 md:pb-6 overflow-auto transition-colors duration-500 ${mainBg} relative`}>
+          <SeasonParticles quarter={state.currentQuarter} />
+          <div className="relative z-10">
+            <PageTransition>
+              {children}
+            </PageTransition>
+          </div>
         </main>
       </div>
 
+      <BottomNav />
+      <FloatingAdvanceButton
+        onClick={advanceQuarter}
+        disabled={state.phase !== "decisions"}
+      />
+
       {showQuarterSummary && lastQuarterResult && (
         <QuarterSummary result={lastQuarterResult} onContinue={dismissSummary} />
+      )}
+
+      {pendingAchievementToasts.length > 0 && (
+        <AchievementToast
+          key={pendingAchievementToasts[0].id}
+          achievement={pendingAchievementToasts[0]}
+          onDone={dismissAchievementToast}
+        />
       )}
     </div>
   );

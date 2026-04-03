@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { type QuarterResult } from "@/store/gameStore";
 import Tooltip from "@/components/ui/Tooltip";
 import { GLOSSARY } from "@/data/glossary";
@@ -10,22 +11,22 @@ interface QuarterSummaryProps {
 }
 
 const weatherInfo: Record<string, { icon: string; label: string; color: string }> = {
-  Normalt: { icon: "🌤", label: "Normalt väder", color: "text-stone-600" },
+  Normalt: { icon: "🌤", label: "Normalt vader", color: "text-stone-600" },
   Torka: { icon: "🔥", label: "Torka", color: "text-orange-600" },
-  Översvämning: { icon: "🌊", label: "Översvämning", color: "text-blue-600" },
+  "Oversvamning": { icon: "🌊", label: "Oversvamning", color: "text-blue-600" },
   Frost: { icon: "🥶", label: "Frost", color: "text-cyan-600" },
-  Utmärkt: { icon: "☀️", label: "Utmärkt väder", color: "text-green-600" },
+  "Utmarkt": { icon: "☀️", label: "Utmarkt vader", color: "text-green-600" },
 };
 
 const seasonStyles: Record<string, { bg: string; border: string; accent: string }> = {
-  "Vår": { bg: "from-green-50 to-emerald-50", border: "border-green-200", accent: "text-green-700" },
+  "Var": { bg: "from-green-50 to-emerald-50", border: "border-green-200", accent: "text-green-700" },
   "Sommar": { bg: "from-yellow-50 to-amber-50", border: "border-yellow-200", accent: "text-yellow-700" },
-  "Höst": { bg: "from-orange-50 to-amber-50", border: "border-orange-200", accent: "text-orange-700" },
+  "Host": { bg: "from-orange-50 to-amber-50", border: "border-orange-200", accent: "text-orange-700" },
   "Vinter": { bg: "from-blue-50 to-indigo-50", border: "border-blue-200", accent: "text-blue-700" },
 };
 
 const categoryIcons: Record<string, string> = {
-  "Väder": "🌦",
+  "Vader": "🌦",
   "Marknad": "📈",
   "Sjukdom": "🦠",
   "Politik": "🏛",
@@ -51,8 +52,24 @@ function Term({ term, children }: { term: string; children: React.ReactNode }) {
   );
 }
 
+function Collapsible({ title, defaultOpen, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen ?? true);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center justify-between w-full text-left py-1"
+      >
+        <span className="text-sm font-bold text-stone-700 uppercase tracking-wide">{title}</span>
+        <span className="text-stone-400 text-xs">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && <div className="mt-1">{children}</div>}
+    </div>
+  );
+}
+
 export default function QuarterSummary({ result, onContinue }: QuarterSummaryProps) {
-  const season = seasonStyles[result.quarter] || seasonStyles["Vår"];
+  const season = seasonStyles[result.quarter] || seasonStyles["Var"];
   const weather = weatherInfo[result.weather] || weatherInfo["Normalt"];
 
   const totalRevenue =
@@ -68,7 +85,6 @@ export default function QuarterSummary({ result, onContinue }: QuarterSummaryPro
   const hasHarvest = harvestedEntries.length > 0;
   const totalHarvestedTons = harvestedEntries.reduce((s, [, t]) => s + t, 0);
 
-  // Market price changes
   const priceChanges = Object.entries(result.marketPrices)
     .map(([crop, price]) => {
       const prev = result.previousMarketPrices[crop] ?? price;
@@ -79,69 +95,104 @@ export default function QuarterSummary({ result, onContinue }: QuarterSummaryPro
     .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
     .slice(0, 5);
 
-  // Revenue items
   const revenueItems = [
-    { label: "Grödförsäljning", value: result.financialRecord.revenue.cropSales },
-    { label: "Djurhållning", value: result.financialRecord.revenue.livestockIncome },
-    { label: "EU-stöd", value: result.financialRecord.revenue.subsidies },
-    { label: "Övrigt", value: result.financialRecord.revenue.other },
+    { label: "Grodoforscaljning", value: result.financialRecord.revenue.cropSales },
+    { label: "Djurhallning", value: result.financialRecord.revenue.livestockIncome },
+    { label: "EU-stod", value: result.financialRecord.revenue.subsidies },
+    { label: "Ovrigt", value: result.financialRecord.revenue.other },
   ].filter((r) => r.value > 0);
 
-  // Grouped costs
   const c = result.financialRecord.costs;
   const variableCosts = [
-    { label: "Utsäde", value: c.seeds },
-    { label: "Gödsel", value: c.fertilizer },
-    { label: "Bränsle", value: c.fuel },
+    { label: "Utsade", value: c.seeds },
+    { label: "Godsel", value: c.fertilizer },
+    { label: "Bransle", value: c.fuel },
     { label: "Foder", value: c.feed },
   ].filter((x) => x.value > 0);
   const variableTotal = variableCosts.reduce((s, x) => s + x.value, 0);
 
   const fixedCosts = [
-    { label: "Löner", value: c.salaries },
+    { label: "Loner", value: c.salaries },
     { label: "Maskiner", value: c.machinery },
-    { label: "Underhåll", value: c.buildingMaintenance },
-    { label: "Försäkring", value: c.insurance },
-    { label: "Veterinär", value: c.veterinary },
+    { label: "Underhall", value: c.buildingMaintenance },
+    { label: "Forsakring", value: c.insurance },
+    { label: "Veterinar", value: c.veterinary },
     { label: "Lagring", value: c.storageCosts ?? 0 },
-    { label: "Övrigt", value: c.other },
+    { label: "Ovrigt", value: c.other },
   ].filter((x) => x.value > 0);
   const fixedTotal = fixedCosts.reduce((s, x) => s + x.value, 0);
 
   const financialCosts = [
-    { label: "Ränta", value: c.loanInterest },
+    { label: "Ranta", value: c.loanInterest },
     { label: "Amortering", value: c.loanAmortization },
   ].filter((x) => x.value > 0);
   const financialTotal = financialCosts.reduce((s, x) => s + x.value, 0);
 
-  // Biggest cost for insight
   const allCostItems = [...variableCosts, ...fixedCosts, ...financialCosts].sort((a, b) => b.value - a.value);
   const biggestCost = allCostItems[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className={`bg-gradient-to-br ${season.bg} rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto border ${season.border}`}>
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className={`bg-gradient-to-br ${season.bg} md:rounded-2xl shadow-2xl md:max-w-2xl w-full md:mx-4 max-h-full md:max-h-[90vh] overflow-y-auto border-t md:border ${season.border} flex flex-col`}>
         {/* Header */}
-        <div className="px-6 pt-6 pb-4 border-b border-stone-200/50">
+        <div className="px-4 md:px-6 pt-4 md:pt-6 pb-3 md:pb-4 border-b border-stone-200/50 shrink-0">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className={`text-2xl font-bold ${season.accent}`}>
-                {result.quarter} - År {result.year}
+              <h2 className={`text-xl md:text-2xl font-bold ${season.accent}`}>
+                {result.quarter} - Ar {result.year}
               </h2>
-              <p className="text-sm text-stone-500 mt-1">Kvartalsrapport</p>
+              <p className="text-sm text-stone-500 mt-0.5">Kvartalsrapport</p>
             </div>
             <div className={`text-center ${weather.color}`}>
-              <span className="text-3xl">{weather.icon}</span>
+              <span className="text-2xl md:text-3xl">{weather.icon}</span>
               <div className="text-xs font-medium mt-1">{weather.label}</div>
             </div>
           </div>
         </div>
 
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-4 md:px-6 py-3 md:py-4 space-y-3 md:space-y-4 overflow-y-auto flex-1">
+          {/* Net result highlight - always visible */}
+          <div className={`p-3 rounded-lg ${netResult >= 0 ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="font-bold text-base md:text-lg text-stone-800">
+                  <Term term="Nettointakt">Resultat</Term>
+                </span>
+                <div className="text-xs text-stone-500 mt-0.5">
+                  {netResult >= 0 ? "Intakter minus kostnader = vinst" : "Intakter minus kostnader = forlust"}
+                </div>
+              </div>
+              <span className={`text-xl md:text-2xl font-bold ${netResult >= 0 ? "text-green-700" : "text-red-600"}`}>
+                {fmtChange(netResult)}
+              </span>
+            </div>
+          </div>
+
+          {/* Cash summary */}
+          <div className={`rounded-lg p-3 md:p-4 ${result.cashChange >= 0 ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-stone-500 font-medium">
+                  <Term term="Kassaflode">Din kassa</Term>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm text-stone-500">{fmt(result.previousCash)}</span>
+                  <span className="text-stone-400">&rarr;</span>
+                  <span className="text-base md:text-lg font-bold text-stone-800">{fmt(result.newCash)}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={`text-lg md:text-xl font-bold ${result.cashChange >= 0 ? "text-green-700" : "text-red-600"}`}>
+                  {fmtChange(result.cashChange)}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Events */}
           {result.events.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-sm font-bold text-stone-700 uppercase tracking-wide">Händelser</h3>
+              <h3 className="text-sm font-bold text-stone-700 uppercase tracking-wide">Handelser</h3>
               {result.events.map((event, i) => {
                 const isNegative = event.effects.some((e) =>
                   e.type === "directCost" || e.value < 0
@@ -158,11 +209,11 @@ export default function QuarterSummary({ result, onContinue }: QuarterSummaryPro
 
                 return (
                   <div key={i} className={`${bgColor} border rounded-lg p-3 flex gap-3`}>
-                    <span className="text-xl">{icon}</span>
-                    <div className="flex-1">
+                    <span className="text-lg md:text-xl">{icon}</span>
+                    <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm text-stone-800">{event.title}</div>
                       <div className="text-xs text-stone-600 mt-0.5">{event.description}</div>
-                      <div className="flex gap-2 mt-1.5 flex-wrap">
+                      <div className="flex gap-1.5 mt-1.5 flex-wrap">
                         {event.effects.map((eff, j) => (
                           <span
                             key={j}
@@ -174,10 +225,10 @@ export default function QuarterSummary({ result, onContinue }: QuarterSummaryPro
                           >
                             {eff.type === "directCost" && `-${fmt(eff.value)}`}
                             {eff.type === "directIncome" && `+${fmt(eff.value)}`}
-                            {eff.type === "yieldModifier" && `${eff.target ? eff.target + ": " : ""}Skörd ${eff.value > 0 ? "+" : ""}${Math.round(eff.value * 100)}%`}
+                            {eff.type === "yieldModifier" && `${eff.target ? eff.target + ": " : ""}Skord ${eff.value > 0 ? "+" : ""}${Math.round(eff.value * 100)}%`}
                             {eff.type === "priceModifier" && `${eff.target ? eff.target + ": " : ""}Pris ${eff.value > 0 ? "+" : ""}${Math.round(eff.value * 100)}%`}
                             {eff.type === "costModifier" && `Kostnader +${Math.round(eff.value * 100)}%`}
-                            {eff.type === "animalHealth" && `${eff.target ? eff.target + ": " : ""}Djurhälsa ${eff.value > 0 ? "+" : ""}${Math.round(eff.value * 100)}%`}
+                            {eff.type === "animalHealth" && `${eff.target ? eff.target + ": " : ""}Djurhalsa ${eff.value > 0 ? "+" : ""}${Math.round(eff.value * 100)}%`}
                           </span>
                         ))}
                       </div>
@@ -190,223 +241,136 @@ export default function QuarterSummary({ result, onContinue }: QuarterSummaryPro
 
           {/* Harvest report */}
           {hasHarvest && (
-            <div className="bg-amber-50/80 border border-amber-200 rounded-lg p-4">
-              <h3 className="text-sm font-bold text-amber-800 uppercase tracking-wide mb-2">
-                Skörd
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                {harvestedEntries.map(([crop, tons]) => (
-                  <div key={crop} className="flex justify-between text-sm">
-                    <span className="text-stone-700">{crop}</span>
-                    <span className="font-semibold text-amber-700">{tons.toFixed(1)} ton</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-2 pt-2 border-t border-amber-200 text-sm font-bold text-amber-800 flex justify-between">
-                <span>Totalt skördat</span>
-                <span>{totalHarvestedTons.toFixed(1)} ton</span>
-              </div>
-              {totalHarvestedTons > 0 && result.siloCapacity > 0 && (
-                <div className="mt-2 text-xs text-amber-700">
-                  <div className="flex justify-between">
-                    <span>Silokapacitet</span>
-                    <span>{result.totalStoredAfter.toFixed(1)} / {result.siloCapacity} ton</span>
-                  </div>
-                  {result.totalStoredAfter >= result.siloCapacity && (
-                    <p className="mt-1 text-amber-600 italic">
-                      ⚠ Silon är full — överskottet såldes direkt till marknadspris. Bygg mer lagerkapacitet för att kunna spara och sälja till bättre pris.
-                    </p>
-                  )}
+            <div className="bg-amber-50/80 border border-amber-200 rounded-lg p-3 md:p-4">
+              <Collapsible title="Skord" defaultOpen={true}>
+                <div className="grid grid-cols-2 gap-2">
+                  {harvestedEntries.map(([crop, tons]) => (
+                    <div key={crop} className="flex justify-between text-sm">
+                      <span className="text-stone-700">{crop}</span>
+                      <span className="font-semibold text-amber-700">{tons.toFixed(1)} ton</span>
+                    </div>
+                  ))}
                 </div>
-              )}
+                <div className="mt-2 pt-2 border-t border-amber-200 text-sm font-bold text-amber-800 flex justify-between">
+                  <span>Totalt skordat</span>
+                  <span>{totalHarvestedTons.toFixed(1)} ton</span>
+                </div>
+                {totalHarvestedTons > 0 && result.siloCapacity > 0 && (
+                  <div className="mt-2 text-xs text-amber-700">
+                    <div className="flex justify-between">
+                      <span>Silokapacitet</span>
+                      <span>{result.totalStoredAfter.toFixed(1)} / {result.siloCapacity} ton</span>
+                    </div>
+                  </div>
+                )}
+              </Collapsible>
             </div>
           )}
 
-          {/* ===== FINANCIAL SUMMARY - single column, grouped ===== */}
-          <div className="bg-white/80 border border-stone-200 rounded-lg p-4">
-            <h3 className="text-sm font-bold text-stone-700 uppercase tracking-wide mb-1">
-              <Term term="Resultaträkning">Resultaträkning</Term>
-            </h3>
-            <p className="text-xs text-stone-400 mb-3">
-              Visar vad som kom in (intäkter) och vad som gick ut (kostnader) detta kvartal.
-            </p>
+          {/* Financial detail - collapsible on mobile */}
+          <div className="bg-white/80 border border-stone-200 rounded-lg p-3 md:p-4">
+            <Collapsible title="Resultatrakning" defaultOpen={false}>
+              <p className="text-xs text-stone-400 mb-3">
+                Intakter och kostnader detta kvartal.
+              </p>
 
-            {/* --- INTÄKTER --- */}
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
-                <span className="text-sm font-semibold text-green-700">
-                  <Term term="Bruttointäkt">Intäkter</Term>
-                  <span className="font-normal text-stone-400 ml-1">— pengar in</span>
-                </span>
-              </div>
-              {revenueItems.length > 0 ? (
-                <div className="space-y-1 ml-4">
-                  {revenueItems.map((r) => (
-                    <div key={r.label} className="flex justify-between text-sm">
-                      <span className="text-stone-600">{r.label}</span>
-                      <span className="font-medium text-green-700">{fmt(r.value)}</span>
-                    </div>
-                  ))}
+              {/* Revenue */}
+              <div className="mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-sm font-semibold text-green-700">Intakter</span>
                 </div>
-              ) : (
-                <div className="ml-4 text-sm text-stone-400 italic">
-                  Inga intäkter detta kvartal. Intäkter kommer från försäljning av grödor, djurprodukter och EU-stöd.
+                {revenueItems.length > 0 ? (
+                  <div className="space-y-1 ml-4">
+                    {revenueItems.map((r) => (
+                      <div key={r.label} className="flex justify-between text-sm">
+                        <span className="text-stone-600">{r.label}</span>
+                        <span className="font-medium text-green-700">{fmt(r.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="ml-4 text-sm text-stone-400 italic">Inga intakter detta kvartal.</div>
+                )}
+                <div className="flex justify-between text-sm font-bold mt-2 ml-4 pt-2 border-t border-green-200">
+                  <span className="text-green-700">Summa intakter</span>
+                  <span className="text-green-700">{fmt(totalRevenue)}</span>
                 </div>
-              )}
-              <div className="flex justify-between text-sm font-bold mt-2 ml-4 pt-2 border-t border-green-200">
-                <span className="text-green-700">Summa intäkter</span>
-                <span className="text-green-700">{fmt(totalRevenue)}</span>
-              </div>
-            </div>
-
-            {/* --- KOSTNADER --- */}
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 rounded-full bg-red-500" />
-                <span className="text-sm font-semibold text-red-700">
-                  <Term term="Driftskostnad">Kostnader</Term>
-                  <span className="font-normal text-stone-400 ml-1">— pengar ut</span>
-                </span>
               </div>
 
-              {/* Rörliga kostnader */}
-              {variableCosts.length > 0 && (
-                <div className="ml-4 mb-3">
-                  <div className="text-xs font-medium text-stone-500 mb-1">
-                    <Term term="Särkostnad">Rörliga kostnader</Term>
-                    <span className="font-normal text-stone-400"> — beror på vad du odlar/har</span>
-                  </div>
-                  {variableCosts.map((x) => (
-                    <div key={x.label} className="flex justify-between text-sm py-0.5">
-                      <span className="text-stone-600 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-300 inline-block" />
-                        {x.label}
-                      </span>
-                      <span className="text-stone-700">{fmt(x.value)}</span>
-                    </div>
-                  ))}
-                  <div className="text-xs text-right text-stone-400 mt-0.5">
-                    = {fmt(variableTotal)}
-                  </div>
+              {/* Costs */}
+              <div className="mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  <span className="text-sm font-semibold text-red-700">Kostnader</span>
                 </div>
-              )}
 
-              {/* Fasta kostnader */}
-              {fixedCosts.length > 0 && (
-                <div className="ml-4 mb-3">
-                  <div className="text-xs font-medium text-stone-500 mb-1">
-                    <Term term="Samkostnad">Fasta kostnader</Term>
-                    <span className="font-normal text-stone-400"> — finns oavsett produktion</span>
+                {variableCosts.length > 0 && (
+                  <div className="ml-4 mb-2">
+                    <div className="text-xs font-medium text-stone-500 mb-1">Rorliga kostnader</div>
+                    {variableCosts.map((x) => (
+                      <div key={x.label} className="flex justify-between text-sm py-0.5">
+                        <span className="text-stone-600">{x.label}</span>
+                        <span className="text-stone-700">{fmt(x.value)}</span>
+                      </div>
+                    ))}
+                    <div className="text-xs text-right text-stone-400 mt-0.5">= {fmt(variableTotal)}</div>
                   </div>
-                  {fixedCosts.map((x) => (
-                    <div key={x.label} className="flex justify-between text-sm py-0.5">
-                      <span className="text-stone-600 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-300 inline-block" />
-                        {x.label}
-                      </span>
-                      <span className="text-stone-700">{fmt(x.value)}</span>
-                    </div>
-                  ))}
-                  <div className="text-xs text-right text-stone-400 mt-0.5">
-                    = {fmt(fixedTotal)}
-                  </div>
-                </div>
-              )}
+                )}
 
-              {/* Finansiella kostnader */}
-              {financialCosts.length > 0 && (
-                <div className="ml-4 mb-3">
-                  <div className="text-xs font-medium text-stone-500 mb-1">
-                    <Term term="Ränta">Lånekostnader</Term>
-                    <span className="font-normal text-stone-400"> — för att ha lånat pengar</span>
+                {fixedCosts.length > 0 && (
+                  <div className="ml-4 mb-2">
+                    <div className="text-xs font-medium text-stone-500 mb-1">Fasta kostnader</div>
+                    {fixedCosts.map((x) => (
+                      <div key={x.label} className="flex justify-between text-sm py-0.5">
+                        <span className="text-stone-600">{x.label}</span>
+                        <span className="text-stone-700">{fmt(x.value)}</span>
+                      </div>
+                    ))}
+                    <div className="text-xs text-right text-stone-400 mt-0.5">= {fmt(fixedTotal)}</div>
                   </div>
-                  {financialCosts.map((x) => (
-                    <div key={x.label} className="flex justify-between text-sm py-0.5">
-                      <span className="text-stone-600 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-300 inline-block" />
-                        <Term term={x.label}>{x.label}</Term>
-                      </span>
-                      <span className="text-stone-700">{fmt(x.value)}</span>
-                    </div>
-                  ))}
-                  <div className="text-xs text-right text-stone-400 mt-0.5">
-                    = {fmt(financialTotal)}
+                )}
+
+                {financialCosts.length > 0 && (
+                  <div className="ml-4 mb-2">
+                    <div className="text-xs font-medium text-stone-500 mb-1">Lanekostnader</div>
+                    {financialCosts.map((x) => (
+                      <div key={x.label} className="flex justify-between text-sm py-0.5">
+                        <span className="text-stone-600">{x.label}</span>
+                        <span className="text-stone-700">{fmt(x.value)}</span>
+                      </div>
+                    ))}
+                    <div className="text-xs text-right text-stone-400 mt-0.5">= {fmt(financialTotal)}</div>
                   </div>
-                </div>
-              )}
+                )}
 
-              <div className="flex justify-between text-sm font-bold ml-4 pt-2 border-t border-red-200">
-                <span className="text-red-700">Summa kostnader</span>
-                <span className="text-red-700">-{fmt(totalCosts)}</span>
-              </div>
-            </div>
-
-            {/* --- NETTORESULTAT --- */}
-            <div className={`p-3 rounded-lg ${netResult >= 0 ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
-              <div className="flex justify-between items-center">
-                <div>
-                  <span className="font-bold text-lg text-stone-800">
-                    <Term term="Nettointäkt">Resultat</Term>
-                  </span>
-                  <div className="text-xs text-stone-500 mt-0.5">
-                    {netResult >= 0 ? "Intäkter minus kostnader = vinst" : "Intäkter minus kostnader = förlust"}
-                  </div>
-                </div>
-                <span className={`text-2xl font-bold ${netResult >= 0 ? "text-green-700" : "text-red-600"}`}>
-                  {fmtChange(netResult)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Cash summary */}
-          <div className={`rounded-lg p-4 ${result.cashChange >= 0 ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs text-stone-500 font-medium">
-                  <Term term="Kassaflöde">Din kassa (pengarna på kontot)</Term>
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-sm text-stone-500">{fmt(result.previousCash)}</span>
-                  <span className="text-stone-400">&rarr;</span>
-                  <span className="text-lg font-bold text-stone-800">{fmt(result.newCash)}</span>
+                <div className="flex justify-between text-sm font-bold ml-4 pt-2 border-t border-red-200">
+                  <span className="text-red-700">Summa kostnader</span>
+                  <span className="text-red-700">-{fmt(totalCosts)}</span>
                 </div>
               </div>
-              <div className="text-right">
-                <div className={`text-xl font-bold ${result.cashChange >= 0 ? "text-green-700" : "text-red-600"}`}>
-                  {fmtChange(result.cashChange)}
-                </div>
-                <div className="text-xs text-stone-400">
-                  {result.cashChange >= 0 ? "ökade" : "minskade"} detta kvartal
-                </div>
-              </div>
-            </div>
+            </Collapsible>
           </div>
 
           {/* Pedagogical insight */}
           <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-3">
-            <div className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">Vad kan du lära dig av detta?</div>
+            <div className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">Vad kan du lara dig?</div>
             <div className="text-sm text-blue-800 space-y-1">
               {totalRevenue === 0 && totalCosts > 0 && (
-                <p>Du hade inga intäkter men kostnader på {fmt(totalCosts)}. Det är vanligt tidigt — du måste investera i utsäde och gödsel innan du kan skörda och sälja.</p>
+                <p>Du hade inga intakter men kostnader pa {fmt(totalCosts)}. Det ar vanligt tidigt -- du maste investera innan du kan skorda.</p>
               )}
               {totalRevenue > 0 && netResult >= 0 && (
                 <p>
                   Bra kvartal! Du gick med {fmt(netResult)} i vinst.
-                  {revenueItems[0] && ` Största intäktskällan var ${revenueItems[0].label.toLowerCase()} (${Math.round((revenueItems[0].value / totalRevenue) * 100)}%).`}
+                  {revenueItems[0] && ` Storsta intaktakallan var ${revenueItems[0].label.toLowerCase()} (${Math.round((revenueItems[0].value / totalRevenue) * 100)}%).`}
                 </p>
               )}
               {totalRevenue > 0 && netResult < 0 && (
-                <p>Förlust på {fmt(Math.abs(netResult))}. Intäkterna ({fmt(totalRevenue)}) räckte inte för att täcka kostnaderna ({fmt(totalCosts)}).</p>
+                <p>Forlust pa {fmt(Math.abs(netResult))}. Intakterna ({fmt(totalRevenue)}) rackte inte for att tacka kostnaderna ({fmt(totalCosts)}).</p>
               )}
               {biggestCost && totalCosts > 0 && (
                 <p>
-                  Största kostnaden: <strong>{biggestCost.label.toLowerCase()}</strong> ({fmt(biggestCost.value)} = {Math.round((biggestCost.value / totalCosts) * 100)}% av alla kostnader).
-                  {biggestCost.label === "Löner" && " Har du för många anställda i förhållande till gårdens storlek?"}
-                  {biggestCost.label === "Gödsel" && " Gödsling ökar skörden med ~15% men kostar. Räkna på om det lönar sig."}
-                  {biggestCost.label === "Foder" && " Foderkostnaden beror på antal djur. Kan du odla eget foder (vall)?"}
-                  {biggestCost.label === "Ränta" && " Räntekostnader minskar du genom att amortera mer på lånen."}
+                  Storsta kostnaden: <strong>{biggestCost.label.toLowerCase()}</strong> ({fmt(biggestCost.value)} = {Math.round((biggestCost.value / totalCosts) * 100)}% av alla kostnader).
                 </p>
               )}
             </div>
@@ -414,41 +378,40 @@ export default function QuarterSummary({ result, onContinue }: QuarterSummaryPro
 
           {/* Market price changes */}
           {priceChanges.length > 0 && (
-            <div className="bg-white/60 border border-stone-200 rounded-lg p-4">
-              <h3 className="text-sm font-bold text-stone-700 uppercase tracking-wide mb-1">
-                Marknadspriser
-              </h3>
-              <p className="text-xs text-stone-400 mb-2">Priserna ändras varje kvartal. Sälj när priset är högt!</p>
-              <div className="space-y-1">
-                {priceChanges.map((p) => (
-                  <div key={p.crop} className="flex items-center justify-between text-sm">
-                    <span className="text-stone-600">{p.crop}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-stone-400 text-xs">{p.prev} kr/ton</span>
-                      <span className="text-stone-400">&rarr;</span>
-                      <span className="font-medium text-stone-800">{p.price} kr/ton</span>
-                      <span className={`text-xs font-bold ${p.change > 0 ? "text-green-600" : "text-red-600"}`}>
-                        {p.change > 0 ? "▲" : "▼"} {Math.abs(Math.round(p.change))}%
-                      </span>
+            <div className="bg-white/60 border border-stone-200 rounded-lg p-3 md:p-4">
+              <Collapsible title="Marknadspriser" defaultOpen={false}>
+                <p className="text-xs text-stone-400 mb-2">Priserna andras varje kvartal. Salj nar priset ar hogt!</p>
+                <div className="space-y-1">
+                  {priceChanges.map((p) => (
+                    <div key={p.crop} className="flex items-center justify-between text-sm">
+                      <span className="text-stone-600">{p.crop}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-stone-400 text-xs hidden sm:inline">{p.prev} kr/ton</span>
+                        <span className="text-stone-400 hidden sm:inline">&rarr;</span>
+                        <span className="font-medium text-stone-800">{p.price} kr/ton</span>
+                        <span className={`text-xs font-bold ${p.change > 0 ? "text-green-600" : "text-red-600"}`}>
+                          {p.change > 0 ? "▲" : "▼"} {Math.abs(Math.round(p.change))}%
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </Collapsible>
             </div>
           )}
         </div>
 
-        {/* Continue button */}
-        <div className="px-6 py-4 border-t border-stone-200/50">
+        {/* Continue button - sticky on mobile */}
+        <div className="px-4 md:px-6 py-3 md:py-4 border-t border-stone-200/50 bg-gradient-to-br shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <button
             onClick={onContinue}
-            className={`w-full py-3 rounded-xl font-bold text-white text-lg transition-all hover:scale-[1.01] active:scale-[0.99] ${
+            className={`w-full py-3 rounded-xl font-bold text-white text-lg transition-all active:scale-[0.98] ${
               netResult >= 0
                 ? "bg-green-600 hover:bg-green-700"
                 : "bg-stone-700 hover:bg-stone-800"
             }`}
           >
-            Fortsätt &rarr;
+            Fortsatt &rarr;
           </button>
         </div>
       </div>

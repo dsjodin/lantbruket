@@ -194,6 +194,7 @@ export function createInitialGameState(params: {
     currentMarketPrices: generateMarketPrices(seed, 1, Quarter.Var),
     priceHistory: {},
     pendingLandOffers: [],
+    unlockedAchievements: [],
   };
 }
 
@@ -869,6 +870,7 @@ export function advanceQuarter(
     priceHistory: updatePriceHistory(state.priceHistory || {}, marketPrices),
     pendingLandOffers: landOffers,
     lastHarvestedCrops: harvestedCrops,
+    unlockedAchievements: state.unlockedAchievements || [],
   };
 }
 

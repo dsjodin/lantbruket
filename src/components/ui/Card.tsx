@@ -22,7 +22,7 @@ export default function Card({
 }: CardProps) {
   return (
     <div
-      className={`bg-white rounded-lg shadow-sm border border-stone-200 p-4 ${accents[accent]} ${className}`}
+      className={`bg-white rounded-lg shadow-sm border border-stone-200 p-4 transition-shadow hover:shadow-md ${accents[accent]} ${className}`}
     >
       {title && (
         <h3 className="text-lg font-semibold text-stone-800 mb-3">{title}</h3>
