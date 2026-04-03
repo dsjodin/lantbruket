@@ -1,14 +1,19 @@
 /**
- * Swedish agricultural subsidy calculations.
+ * Swedish agricultural subsidy calculations (2025 CAP structure).
  */
 
 import type { Farm, SubsidyApplication, SubsidyType } from "@/types";
 import { Region, AnimalType } from "@/types";
 import { REGIONS_DATA } from "@/data/regions";
-import { LIVESTOCK_DATA } from "@/data/livestock";
+import {
+  OMFORDELNINGSSTOD_PER_HA,
+  ECO_SCHEME_PER_HA,
+  NOTKREATURSSTOD,
+  MIN_CROPS_FOR_ECO_SCHEME,
+} from "@/data/subsidies";
 
 /**
- * Calculate subsidies based on Swedish agricultural support rules.
+ * Calculate subsidies based on Swedish agricultural support rules (2025 CAP).
  * Returns an array of SubsidyApplication objects with status "Beviljad".
  */
 export function calculateSubsidies(
@@ -32,17 +37,21 @@ export function calculateSubsidies(
 
     switch (subsidyType) {
       case "Grundbetalning":
-        // Per hectare based on region
+        // Gårdsstöd per hectare - flat rate across all regions (134.80 EUR/ha)
         amount = totalHa * regionData.grundbetalningPerHa;
         break;
 
-      case "Förgröningsstöd":
-        // 700 kr/ha, but requires 3+ different crops if >30ha
-        if (totalHa > 30 && distinctCrops.size < 3) {
-          // Does not qualify
+      case "Omfördelningsstöd":
+        // 16.40 EUR/ha for all farmers with land
+        amount = totalHa * OMFORDELNINGSSTOD_PER_HA;
+        break;
+
+      case "Eco-scheme":
+        // 41 EUR/ha, requires 3+ different crops if >30ha
+        if (totalHa > 30 && distinctCrops.size < MIN_CROPS_FOR_ECO_SCHEME) {
           amount = 0;
         } else {
-          amount = totalHa * 700;
+          amount = totalHa * ECO_SCHEME_PER_HA;
         }
         break;
 
@@ -57,7 +66,6 @@ export function calculateSubsidies(
         break;
 
       case "Djurvälfärdsersättning": {
-        // Per animal based on type - use a flat rate per animal
         const animalWelfareRates: Record<string, number> = {
           [AnimalType.Mjolkko]: 1600,
           [AnimalType.Diko]: 1100,
@@ -73,13 +81,12 @@ export function calculateSubsidies(
       }
 
       case "Nötkreatursstöd": {
-        // 1050 kr per cow (mjölkko + diko)
         const cowCount = farm.livestock
           .filter(
             (h) => h.type === AnimalType.Mjolkko || h.type === AnimalType.Diko
           )
           .reduce((sum, h) => sum + h.count, 0);
-        amount = cowCount * 1050;
+        amount = cowCount * NOTKREATURSSTOD;
         break;
       }
     }
@@ -87,7 +94,7 @@ export function calculateSubsidies(
     if (amount > 0) {
       results.push({
         type: subsidyType,
-        appliedYear: 0, // Caller should set the actual year
+        appliedYear: 0,
         amount: Math.round(amount),
         status: "Beviljad",
       });

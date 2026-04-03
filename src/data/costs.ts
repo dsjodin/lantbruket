@@ -11,7 +11,7 @@ export const MACHINERY_DEPRECIATION_PER_HA: Record<MachineryLevel, number> = {
 };
 
 /** Försäkringskostnad per hektar och år (kr) */
-export const INSURANCE_PER_HA = 300;
+export const INSURANCE_PER_HA = 400;
 
 /** Försäkringskostnad per djur och år (kr) */
 export const INSURANCE_PER_ANIMAL = 500;
@@ -36,3 +36,9 @@ export const BUILDING_UPGRADE_COST = {
   toStandard: 300000,
   toExpanded: 800000,
 };
+
+/** Administrationskostnad per hektar och år (kr) - rådgivning, bokföring, diverse */
+export const ADMIN_COST_PER_HA_PER_YEAR = 250;
+
+/** Administrationskostnad per djur och år (kr) */
+export const ADMIN_COST_PER_ANIMAL_PER_YEAR = 500;

@@ -60,9 +60,15 @@ export default function StodPage() {
             </div>
           </div>
           <div className="p-3 bg-stone-50 rounded-lg">
-            <div className="font-medium">Förgröningsstöd</div>
+            <div className="font-medium">Omfördelningsstöd</div>
             <div className="text-stone-500">
-              ~700 kr/ha. Kräver växtföljd med minst 3 grödor om gården är över 30 ha.
+              ~181 kr/ha. Betalas till alla jordbrukare med stödberättigad mark.
+            </div>
+          </div>
+          <div className="p-3 bg-stone-50 rounded-lg">
+            <div className="font-medium">Eco-scheme (Precisionsjordbruk)</div>
+            <div className="text-stone-500">
+              ~453 kr/ha. Kräver växtföljd med minst 3 grödor om gården är över 30 ha.
             </div>
           </div>
           <div className="p-3 bg-stone-50 rounded-lg">

@@ -3,8 +3,11 @@ import type { Farm } from "@/types/farm";
 import type { SubsidyApplication } from "@/types/economics";
 import { REGIONS_DATA } from "./regions";
 
-/** Förgröningsstöd per hektar (kr) */
-export const FORGRONINGSSTOD_PER_HA = 700;
+/** Omfördelningsstöd per hektar (kr) - 16.40 EUR x 11.06 */
+export const OMFORDELNINGSSTOD_PER_HA = 181;
+
+/** Eco-scheme (precisionsjordbruk/planering) per hektar (kr) - 41 EUR x 11.06 */
+export const ECO_SCHEME_PER_HA = 453;
 
 /** Miljöersättning per hektar, genomsnittligt (kr) */
 export const MILJOERSATTNING_PER_HA = 900;
@@ -17,11 +20,11 @@ export const DJURVALFARD_PER_ANIMAL: Partial<Record<AnimalType, number>> = {
   [AnimalType.Tacka]: 600,
 };
 
-/** Nötkreatursstöd per nötkreatur och år (kr) */
-export const NOTKREATURSSTOD = 1050;
+/** Nötkreatursstöd per nötkreatur och år (kr) - 93.23 EUR x 11.06 */
+export const NOTKREATURSSTOD = 1031;
 
-/** Minst 3 grödor krävs för förgröningsstöd på gårdar > 30 ha */
-export const MIN_CROPS_FOR_FORGRONING = 3;
+/** Minst 3 grödor krävs för eco-scheme på gårdar > 30 ha */
+export const MIN_CROPS_FOR_ECO_SCHEME = 3;
 
 /**
  * Beräkna stödberättigande och uppskattade belopp.
@@ -33,10 +36,10 @@ export function calculateSubsidies(
 ): SubsidyApplication[] {
   const regionData = REGIONS_DATA[region];
   const totalHa = farm.totalHectares;
-  const currentYear = 0; // Sätts av anroparen
+  const currentYear = 0;
   const subsidies: SubsidyApplication[] = [];
 
-  // Grundbetalning - alla jordbrukare med stödberättigad mark
+  // Grundbetalning (gårdsstöd) - alla jordbrukare med stödberättigad mark
   if (totalHa > 0) {
     subsidies.push({
       type: "Grundbetalning",
@@ -46,20 +49,30 @@ export function calculateSubsidies(
     });
   }
 
-  // Förgröningsstöd - kräver minst 3 grödor om gården > 30 ha
+  // Omfördelningsstöd - alla jordbrukare med mark
+  if (totalHa > 0) {
+    subsidies.push({
+      type: "Omfördelningsstöd",
+      appliedYear: currentYear,
+      amount: Math.round(OMFORDELNINGSSTOD_PER_HA * totalHa),
+      status: "Ansökt",
+    });
+  }
+
+  // Eco-scheme (precisionsjordbruk) - krav på grödmångfald
   const uniqueCrops = new Set(
     farm.fields
       .filter((f) => f.crop !== null && f.crop !== CropType.Trada)
       .map((f) => f.crop)
   );
-  const eligibleForForgroning =
-    totalHa <= 30 || uniqueCrops.size >= MIN_CROPS_FOR_FORGRONING;
+  const eligibleForEcoScheme =
+    totalHa <= 30 || uniqueCrops.size >= MIN_CROPS_FOR_ECO_SCHEME;
 
-  if (eligibleForForgroning && totalHa > 0) {
+  if (eligibleForEcoScheme && totalHa > 0) {
     subsidies.push({
-      type: "Förgröningsstöd",
+      type: "Eco-scheme",
       appliedYear: currentYear,
-      amount: Math.round(FORGRONINGSSTOD_PER_HA * totalHa),
+      amount: Math.round(ECO_SCHEME_PER_HA * totalHa),
       status: "Ansökt",
     });
   }

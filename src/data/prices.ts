@@ -2,11 +2,11 @@ import { CropType } from "@/types/enums";
 
 /** Base prices per ton in SEK */
 export const BASE_PRICES: Record<CropType, number> = {
-  [CropType.Hostvete]: 2200,
+  [CropType.Hostvete]: 2100,
   [CropType.Varkorn]: 1900,
   [CropType.Havre]: 1800,
-  [CropType.Hostraps]: 4500,
-  [CropType.Vall]: 1200,
+  [CropType.Hostraps]: 4600,
+  [CropType.Vall]: 1000,
   [CropType.Potatis]: 2500,
   [CropType.Sockerbeta]: 450,
   [CropType.Trada]: 0,
